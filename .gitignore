@@ -1,0 +1,12 @@
+# Dependencies and scratch
+node_modules/
+artifacts/
+.playwright-cli/
+
+# Nendo/SQLite operational derivatives, which belong to Nendo while it holds a file open
+*.nendo-journal
+*.nendo-wal
+*.nendo-shm
+*.nendo.write-owner
+*.nendo.backup
+*.nendo.tmp
