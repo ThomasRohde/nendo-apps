@@ -9,7 +9,7 @@ This is for changing the apps. To use them, the [README](README.md) is all you n
 | Gantt | [`extensions/gantt`](extensions/gantt/README.md) | none | `Review-Gantt.ps1` |
 | Capability Atlas | [`extensions/bcm-atlas`](extensions/bcm-atlas/README.md) | `workspace/BCM.nendo` | `Review-BcmAtlas.ps1` |
 | Archi | [`extensions/archi`](extensions/archi/README.md) | `workspace/Archi.nendo` | `Review-ArchiWorkbench.ps1` |
-| Manuscript | [`extensions/manuscript`](extensions/manuscript/README.md) | `workspace/Manuscript.nendo`, `Milo.nendo` | `Review-Manus.ps1` |
+| Manuscript | [`extensions/manuscript`](extensions/manuscript/README.md) | `workspace/Manuscript.nendo` | `Review-Manus.ps1` |
 | Deck | [`extensions/deck`](extensions/deck/README.md) | `workspace/Deck.nendo` | `Review-Deck.ps1` |
 | Brandkits | `extensions/brandkits` | `workspace/Brandkits.nendo` | `Review-Brandkits.ps1` |
 | Garden | [`extensions/garden`](extensions/garden/README.md) | `workspace/Garden.nendo` | `Review-Garden.ps1` |

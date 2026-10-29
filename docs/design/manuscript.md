@@ -4,7 +4,7 @@ A manuscript written as one quiet continuous page and kept paragraph by paragrap
 Nendo application: a `.nendo` file with record types, a declared hierarchy, link records, screens
 and a custom view, `extensions/manuscript/`, that carries Tiptap (ADR-0013). It needs no host
 change. `tools/Build-Manus.mjs` builds it into an empty file; `workspace/Manuscript.nendo` holds
-the owner's paper and `workspace/Milo.nendo` a picture book. What the view does, key by key, is in the
+the owner's paper. What the view does, key by key, is in the
 package's [README](../../extensions/manuscript/README.md).
 
 The aim: long-form writing that feels like one continuous document while every paragraph is

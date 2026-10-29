@@ -31,7 +31,6 @@ files that matter.
 | --- | --- | --- |
 | **Garden** | Markdown notes in a tree. `[[links]]`, `#tags` and `- [ ]` tasks become records, and a living graph shows how the notes connect. | [Garden.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Garden.nendo) |
 | **Manuscript** | Write a book or paper as one quiet continuous page, kept paragraph by paragraph, and typeset it. The example is a paper in progress about Nendo. | [Manuscript.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Manuscript.nendo) |
-| **Milo** | The same Manuscript app holding a picture book, *Milo and the Paper Boat*. | [Milo.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Milo.nendo) |
 | **Deck** | Slide decks with twenty-one layouts and six templates. Present with a presenter console, and export to HTML or PowerPoint. | [Deck.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Deck.nendo) |
 | **Clay** | Collect anything. Make shelves and fill them; when a detail has no place yet, Clay proposes one. | [Clay.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Clay.nendo) |
 | **Billable** | A freelancer's workspace: clients, projects, time, expenses, invoices and payments. | [Billable.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Billable.nendo) |

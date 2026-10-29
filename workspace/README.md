@@ -11,7 +11,6 @@ live planner are in the `nendo` repository's `workspace/`.
 | `Garden.nendo` | [Garden](../docs/design/garden.md), a garden of Markdown notes whose `[[links]]`, `#tags` and `- [ ]` tasks are records, with the [Garden view](../extensions/garden/README.md) (reading first, a living d3 graph) and its own agent skill in the file. Built by `tools/Build-Garden.mjs`. | Yes |
 | `Deck.nendo` | [Deck](../extensions/deck/README.md): slide decks with twenty-one layouts, six templates, brand kits from Brandkits, Present with a presenter console and rehearsal, and HTML and PowerPoint export, with an example deck and its own agent skill in the file. Built by `tools/Build-Deck.mjs`. | Yes |
 | `Manuscript.nendo` | A new file of the Manuscript app (File > New manuscript, ADR-0022): the owner's paper in progress, *Malleable Software in One File: Nendo as a Case Study*, with real screenshots. | Yes |
-| `Milo.nendo` | A Manuscript file holding the owner's picture book *Milo and the Paper Boat*. | Yes |
 | `Clay.nendo` | [Clay](../extensions/clay/README.md), a collect-anything app that starts empty and grows its own shape. | Yes |
 | `Brandkits.nendo` | Brand kits made with the launched agent, with the [Brandkits package](../extensions/brandkits/nendo-package.json) in the file. | Yes |
 | `Billable.nendo`, `Envelope.nendo`, `Desk.nendo`, `Sketchboard.nendo`, `Dynamo.nendo`, `Casefile.nendo` | Apps an agent built in the file, with no package source in this repository: what they hold is in the file itself. | Yes |
