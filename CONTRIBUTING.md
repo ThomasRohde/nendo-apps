@@ -69,8 +69,9 @@ or a link has no app, so a new demo file needs its card there as well as its row
 
 A release carries every tracked file under `workspace/`, each of them as a web page, every package
 under `extensions/` as `<folder>.zip`, the web app site as `site.zip`, and `SHA256SUMS.txt`.
-Publishing it runs `.github/workflows/pages.yml`, which puts `site.zip` on GitHub Pages at
-https://thomasrohde.github.io/nendo-apps/. Close the demo files in Nendo first: an open file is
+`-Publish` then starts `.github/workflows/pages.yml` on `main`, which puts `site.zip` on GitHub
+Pages at https://thomasrohde.github.io/nendo-apps/. To publish an earlier release's site again,
+run `gh workflow run pages.yml --ref main -f tag=<tag>`. Close the demo files in Nendo first: an open file is
 refused by name.
 
 ```powershell

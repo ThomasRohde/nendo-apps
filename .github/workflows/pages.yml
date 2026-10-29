@@ -1,11 +1,15 @@
 # Publishes the web apps on GitHub Pages: the site.zip that tools/Build-Release.ps1 attaches to a
 # release, built from the demo files by the host's own web export. Nothing is built here.
+# Build-Release.ps1 -Publish starts it on main after creating the release: the github-pages
+# environment deploys only from main, so a run on the release's tag would be refused.
 name: Web apps
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: The release whose site.zip to publish; the latest when empty
+        required: false
 
 permissions:
   contents: read
@@ -26,7 +30,7 @@ jobs:
       - name: Download the site from the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ inputs.tag }}
         run: |
           gh release download $TAG --repo "$GITHUB_REPOSITORY" --pattern site.zip --dir .
           mkdir _site

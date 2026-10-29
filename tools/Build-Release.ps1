@@ -9,8 +9,8 @@ workspace/, each of them as a Nendo web page (<Name>.html), every package under 
 The demo files are checked first with the host's Test-BinaryAssets.ps1, so a file that is open
 in Nendo or not whole is refused by name rather than released. A package .zip holds the package
 folder's files at its root, which is what Import package… reads. The web pages and the site come
-from tools/Build-WebPages.ps1; .github/workflows/pages.yml publishes site.zip on GitHub Pages
-when the release is published.
+from tools/Build-WebPages.ps1; .github/workflows/pages.yml publishes site.zip on GitHub Pages;
+-Publish starts it on main once the release exists.
 
 With -Publish it creates the GitHub release <Tag> on ThomasRohde/nendo-apps with gh and uploads
 every file. The README links to releases/latest/download/<name>, so the names never carry a
@@ -80,4 +80,7 @@ if ($Publish) {
     $files = @(Get-ChildItem $out -File | ForEach-Object FullName)
     gh release create $Tag --repo ThomasRohde/nendo-apps --title "Nendo apps $($Tag.TrimStart('v'))" --notes-file $notesFile @files
     if ($LASTEXITCODE -ne 0) { throw "gh release create $Tag failed." }
+    gh workflow run pages.yml --repo ThomasRohde/nendo-apps --ref main -f tag=$Tag
+    if ($LASTEXITCODE -ne 0) { throw "The release $Tag is published, but its site was not sent to GitHub Pages: gh workflow run pages.yml failed." }
+    Write-Host 'GitHub Pages deploy started: gh run list --repo ThomasRohde/nendo-apps --workflow pages.yml'
 }
