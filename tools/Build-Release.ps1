@@ -1,13 +1,16 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-Collects a release of the apps: every tracked demo file under workspace/ and every package
-under extensions/ as <folder>.zip, with SHA256SUMS.txt, into artifacts/release/.
+Collects a release of the apps into artifacts/release/: every tracked demo file under
+workspace/, each of them as a Nendo web page (<Name>.html), every package under extensions/ as
+<folder>.zip, the web app site as site.zip, and SHA256SUMS.txt.
 
 .DESCRIPTION
 The demo files are checked first with the host's Test-BinaryAssets.ps1, so a file that is open
 in Nendo or not whole is refused by name rather than released. A package .zip holds the package
-folder's files at its root, which is what Import package… reads.
+folder's files at its root, which is what Import package… reads. The web pages and the site come
+from tools/Build-WebPages.ps1; .github/workflows/pages.yml publishes site.zip on GitHub Pages
+when the release is published.
 
 With -Publish it creates the GitHub release <Tag> on ThomasRohde/nendo-apps with gh and uploads
 every file. The README links to releases/latest/download/<name>, so the names never carry a
@@ -45,13 +48,19 @@ foreach ($package in $packages) {
     Compress-Archive -Path (Join-Path $package.FullName '*') -DestinationPath $zip
 }
 
+& (Join-Path $PSScriptRoot 'Build-WebPages.ps1')
+if (-not $?) { throw 'The web pages did not build; nothing was released.' }
+$web = Join-Path $root 'artifacts/web'
+Copy-Item (Join-Path $web 'pages/*.html') $out
+Compress-Archive -Path (Join-Path $web 'site/*') -DestinationPath (Join-Path $out 'site.zip')
+
 $assets = Get-ChildItem $out -File | Sort-Object Name
 $sums = $assets | ForEach-Object {
     '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
 }
 [IO.File]::WriteAllText((Join-Path $out 'SHA256SUMS.txt'), (($sums -join "`n") + "`n"))
 
-Write-Host ("{0} demo files and {1} packages in {2}" -f $tracked.Count, $packages.Count, $out)
+Write-Host ("{0} demo files, {0} web pages, {1} packages and the site in {2}" -f $tracked.Count, $packages.Count, $out)
 
 if ($Publish) {
     $versions = $packages | ForEach-Object {
@@ -60,6 +69,7 @@ if ($Publish) {
     }
     $notes = @(
         'Download a `.nendo` file and open it in Nendo, or import a view''s `.zip` into a file of your own.'
+        'Without Nendo, open an app at https://thomasrohde.github.io/nendo-apps/, or download its `.html` web page and open it in a browser.'
         'The [README](https://github.com/ThomasRohde/nendo-apps#readme) says what each app does.'
         ''
         '| View | Version |'

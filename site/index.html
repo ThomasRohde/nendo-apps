@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nendo apps</title>
+<meta name="description" content="Nendo apps that run in your browser, with nothing to install.">
+<style>
+  :root {
+    color-scheme: light dark;
+    --canvas: #f9f9fa;
+    --surface: #ffffff;
+    --ink: #1b1b1b;
+    --muted: #5d5d5d;
+    --line: #e5e5e5;
+    --line-strong: #d1d1d1;
+    --cobalt: #005fb8;
+    --cobalt-soft: #e5eff9;
+    --shadow: 0 1px 2px rgba(20, 23, 28, 0.05), 0 12px 32px -16px rgba(20, 23, 28, 0.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --canvas: #272829;
+      --surface: #2d2e30;
+      --ink: #ffffff;
+      --muted: #c5c5c5;
+      --line: #3b3c3e;
+      --line-strong: #4b4c4f;
+      --cobalt: #60cdff;
+      --cobalt-soft: #1f3a4a;
+      --shadow: 0 1px 0 rgba(255, 255, 255, 0.02), 0 20px 48px -16px rgba(0, 0, 0, 0.7);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font: 15px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 48px 16px 64px; }
+  h1 { font-size: 32px; line-height: 1.2; margin: 0 0 12px; font-weight: 600; }
+  h2 { font-size: 18px; margin: 40px 0 6px; font-weight: 600; }
+  p { margin: 0 0 12px; max-width: 68ch; }
+  .lead { font-size: 17px; color: var(--muted); }
+  .muted { color: var(--muted); }
+  a { color: var(--cobalt); }
+  .notes {
+    display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    margin: 28px 0 8px; padding: 0; list-style: none;
+  }
+  .notes li { background: var(--cobalt-soft); border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+  .notes strong { display: block; }
+  .apps {
+    display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    margin: 14px 0 0; padding: 0; list-style: none;
+  }
+  .app {
+    display: grid; grid-template-columns: 48px 1fr; gap: 4px 14px; align-content: start;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px; box-shadow: var(--shadow); color: inherit; text-decoration: none; height: 100%;
+  }
+  .app:hover { border-color: var(--line-strong); }
+  .app:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .app img { width: 48px; height: 48px; border-radius: 10px; grid-row: span 3; }
+  .app .name { font-weight: 600; font-size: 16px; }
+  .app .what { color: var(--muted); font-size: 14px; }
+  .app .open { color: var(--cobalt); font-size: 14px; font-weight: 600; margin-top: 6px; }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Nendo apps in your browser</h1>
+  <p class="lead">Every app here runs in your browser, on any computer, with nothing to install. Each one
+    is a whole <a href="https://thomasrohde.github.io/nendo/">Nendo</a> file: its screens, its
+    views, Studio and its history, with example data to try.</p>
+  <ul class="notes">
+    <li><strong>Your changes stay with you.</strong> The browser keeps your copy of the app, and only
+      you see it. Nothing you change goes back to this site.</li>
+    <li><strong>Keep your work.</strong> <em>Download file</em> in the file menu saves your copy as a
+      <code>.nendo</code> file, which opens in Nendo or in the same app here.</li>
+    <li><strong>Install it.</strong> Edge and Chrome offer to install an app, and it then opens in a
+      window of its own, offline too.</li>
+  </ul>
+
+  <h2>Write, plan and keep</h2>
+  <ul class="apps">
+    <li><a class="app" href="./garden/"><img src="./garden/icons/icon-192.png" alt=""><span class="name">Garden</span><span class="what">Markdown notes in a tree, with links, tags and tasks, and a living graph of how they connect.</span><span class="open">Open Garden</span></a></li>
+    <li><a class="app" href="./manuscript/"><img src="./manuscript/icons/icon-192.png" alt=""><span class="name">Manuscript</span><span class="what">Write a book or paper as one quiet continuous page, and typeset it.</span><span class="open">Open Manuscript</span></a></li>
+    <li><a class="app" href="./deck/"><img src="./deck/icons/icon-192.png" alt=""><span class="name">Deck</span><span class="what">Slide decks with twenty-one layouts and six templates. Present, or export to HTML or PowerPoint.</span><span class="open">Open Deck</span></a></li>
+    <li><a class="app" href="./clay/"><img src="./clay/icons/icon-192.png" alt=""><span class="name">Clay</span><span class="what">Collect anything on shelves; a detail with no place yet gets one.</span><span class="open">Open Clay</span></a></li>
+    <li><a class="app" href="./billable/"><img src="./billable/icons/icon-192.png" alt=""><span class="name">Billable</span><span class="what">A freelancer's clients, projects, time, expenses, invoices and payments.</span><span class="open">Open Billable</span></a></li>
+    <li><a class="app" href="./envelope/"><img src="./envelope/icons/icon-192.png" alt=""><span class="name">Envelope</span><span class="what">A personal zero-based budget: give every amount a job, and reconcile your accounts.</span><span class="open">Open Envelope</span></a></li>
+  </ul>
+
+  <h2>Model and map</h2>
+  <ul class="apps">
+    <li><a class="app" href="./archi/"><img src="./archi/icons/icon-192.png" alt=""><span class="name">Archi</span><span class="what">An ArchiMate 3.2 modeller: the model tree, diagrams, properties and analysis.</span><span class="open">Open Archi</span></a></li>
+    <li><a class="app" href="./bcm/"><img src="./bcm/icons/icon-192.png" alt=""><span class="name">Capability Atlas</span><span class="what">A business capability map with maturity heatmaps, assessments and application coverage.</span><span class="open">Open Capability Atlas</span></a></li>
+  </ul>
+
+  <h2>Made with an agent</h2>
+  <p class="muted">These apps are built to work with a coding agent that Nendo starts beside the file.
+    In the browser there is no agent, so you can look around, open the examples and edit by hand;
+    to ask an agent for more, <a href="https://github.com/ThomasRohde/nendo-apps#get-started">use them in Nendo</a>.</p>
+  <ul class="apps">
+    <li><a class="app" href="./brandkits/"><img src="./brandkits/icons/icon-192.png" alt=""><span class="name">Brandkits</span><span class="what">Brand kits: colours, typefaces, logos and samples, with every contrast ratio checked.</span><span class="open">Open Brandkits</span></a></li>
+    <li><a class="app" href="./sketchboard/"><img src="./sketchboard/icons/icon-192.png" alt=""><span class="name">Sketchboard</span><span class="what">Boxes-and-arrows diagrams, drafted whole or reworked a part at a time.</span><span class="open">Open Sketchboard</span></a></li>
+    <li><a class="app" href="./dynamo/"><img src="./dynamo/icons/icon-192.png" alt=""><span class="name">Dynamo</span><span class="what">Stock-and-flow models, simulated live as you move the sliders.</span><span class="open">Open Dynamo</span></a></li>
+    <li><a class="app" href="./casefile/"><img src="./casefile/icons/icon-192.png" alt=""><span class="name">Casefile</span><span class="what">An investigation wall: claims, sources, evidence for and against, and a brief.</span><span class="open">Open Casefile</span></a></li>
+    <li><a class="app" href="./desk/"><img src="./desk/icons/icon-192.png" alt=""><span class="name">Desk</span><span class="what">Hand research and writing to an agent, and review what it delivers.</span><span class="open">Open Desk</span></a></li>
+  </ul>
+
+  <footer class="muted">
+    <p>Nendo is a research project, not a supported product. The example data is made up.
+      Prefer the desktop app? <a href="https://github.com/ThomasRohde/nendo-apps">nendo-apps on GitHub</a>
+      has every app as a <code>.nendo</code> file, and says how to get Nendo.</p>
+  </footer>
+</main>
+</body>
+</html>

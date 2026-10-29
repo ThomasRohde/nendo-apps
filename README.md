@@ -5,7 +5,11 @@ application and its data live together in one `.nendo` file. Each app here is a 
 download it, open it in Nendo, and it works. Its record types, screens and views are all inside
 the file, with example data to try them on.
 
-## Get started
+**No Nendo? Use them in your browser.** Every app also runs as a web page, on any computer, with
+nothing to install: [open the apps in your browser](https://thomasrohde.github.io/nendo-apps/). See
+[In your browser](#in-your-browser).
+
+## Get started in Nendo
 
 1. **Install Nendo.** It runs on Windows (x64). Nendo is not offered as a download
    yet: you build the installer from source, as the
@@ -27,21 +31,21 @@ files that matter.
 
 ### Write, plan and keep
 
-| App | What it does | Download |
+| App | What it does | Get it |
 | --- | --- | --- |
-| **Garden** | Markdown notes in a tree. `[[links]]`, `#tags` and `- [ ]` tasks become records, and a living graph shows how the notes connect. | [Garden.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Garden.nendo) |
-| **Manuscript** | Write a book or paper as one quiet continuous page, kept paragraph by paragraph, and typeset it. The example is a paper in progress about Nendo. | [Manuscript.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Manuscript.nendo) |
-| **Deck** | Slide decks with twenty-one layouts and six templates. Present with a presenter console, and export to HTML or PowerPoint. | [Deck.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Deck.nendo) |
-| **Clay** | Collect anything. Make shelves and fill them; when a detail has no place yet, Clay proposes one. | [Clay.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Clay.nendo) |
-| **Billable** | A freelancer's workspace: clients, projects, time, expenses, invoices and payments. | [Billable.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Billable.nendo) |
-| **Envelope** | A personal zero-based budget: give every amount a job, set money aside, and reconcile your accounts. | [Envelope.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Envelope.nendo) |
+| **Garden** | Markdown notes in a tree. `[[links]]`, `#tags` and `- [ ]` tasks become records, and a living graph shows how the notes connect. | [Open in browser](https://thomasrohde.github.io/nendo-apps/garden/) · [Garden.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Garden.nendo) |
+| **Manuscript** | Write a book or paper as one quiet continuous page, kept paragraph by paragraph, and typeset it. The example is a paper in progress about Nendo. | [Open in browser](https://thomasrohde.github.io/nendo-apps/manuscript/) · [Manuscript.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Manuscript.nendo) |
+| **Deck** | Slide decks with twenty-one layouts and six templates. Present with a presenter console, and export to HTML or PowerPoint. | [Open in browser](https://thomasrohde.github.io/nendo-apps/deck/) · [Deck.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Deck.nendo) |
+| **Clay** | Collect anything. Make shelves and fill them; when a detail has no place yet, Clay proposes one. | [Open in browser](https://thomasrohde.github.io/nendo-apps/clay/) · [Clay.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Clay.nendo) |
+| **Billable** | A freelancer's workspace: clients, projects, time, expenses, invoices and payments. | [Open in browser](https://thomasrohde.github.io/nendo-apps/billable/) · [Billable.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Billable.nendo) |
+| **Envelope** | A personal zero-based budget: give every amount a job, set money aside, and reconcile your accounts. | [Open in browser](https://thomasrohde.github.io/nendo-apps/envelope/) · [Envelope.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Envelope.nendo) |
 
 ### Model and map
 
-| App | What it does | Download |
+| App | What it does | Get it |
 | --- | --- | --- |
-| **Archi** | An ArchiMate 3.2 modeller in the manner of Archi: the model tree, diagrams, properties and analysis, offline in one file. | [Archi.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Archi.nendo) |
-| **Capability Atlas** | A business capability map of a fictional company, with maturity heatmaps, assessments over time and application coverage. | [BCM.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/BCM.nendo) |
+| **Archi** | An ArchiMate 3.2 modeller in the manner of Archi: the model tree, diagrams, properties and analysis, offline in one file. | [Open in browser](https://thomasrohde.github.io/nendo-apps/archi/) · [Archi.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Archi.nendo) |
+| **Capability Atlas** | A business capability map of a fictional company, with maturity heatmaps, assessments over time and application coverage. | [Open in browser](https://thomasrohde.github.io/nendo-apps/bcm/) · [BCM.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/BCM.nendo) |
 
 ### Made with an agent
 
@@ -51,13 +55,35 @@ drafts it in the file, and you pick and accept what you keep. The
 [Agents guide](https://thomasrohde.github.io/nendo/docs/agents/) explains how to set one up.
 Everything else in these files works without an agent.
 
-| App | What it does | Download |
+| App | What it does | Get it |
 | --- | --- | --- |
-| **Brandkits** | Brand kits: colours, typefaces, logos and samples, with every contrast ratio checked against WCAG 2.2. Deck imports them. | [Brandkits.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Brandkits.nendo) |
-| **Sketchboard** | Boxes-and-arrows diagrams. Ask for a whole board, or select a part and choose between the agent's variants. | [Sketchboard.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Sketchboard.nendo) |
-| **Dynamo** | Stock-and-flow models, simulated live as you move the sliders, with scenarios and experiments. | [Dynamo.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Dynamo.nendo) |
-| **Casefile** | An investigation wall: claims, sources with exact quotes, evidence for and against, and a brief written from what survives. | [Casefile.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Casefile.nendo) |
-| **Desk** | Hand research and writing work to an agent, follow its steps, answer its questions and review what it delivers. | [Desk.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Desk.nendo) |
+| **Brandkits** | Brand kits: colours, typefaces, logos and samples, with every contrast ratio checked against WCAG 2.2. Deck imports them. | [Open in browser](https://thomasrohde.github.io/nendo-apps/brandkits/) · [Brandkits.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Brandkits.nendo) |
+| **Sketchboard** | Boxes-and-arrows diagrams. Ask for a whole board, or select a part and choose between the agent's variants. | [Open in browser](https://thomasrohde.github.io/nendo-apps/sketchboard/) · [Sketchboard.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Sketchboard.nendo) |
+| **Dynamo** | Stock-and-flow models, simulated live as you move the sliders, with scenarios and experiments. | [Open in browser](https://thomasrohde.github.io/nendo-apps/dynamo/) · [Dynamo.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Dynamo.nendo) |
+| **Casefile** | An investigation wall: claims, sources with exact quotes, evidence for and against, and a brief written from what survives. | [Open in browser](https://thomasrohde.github.io/nendo-apps/casefile/) · [Casefile.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Casefile.nendo) |
+| **Desk** | Hand research and writing work to an agent, follow its steps, answer its questions and review what it delivers. | [Open in browser](https://thomasrohde.github.io/nendo-apps/desk/) · [Desk.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Desk.nendo) |
+
+## In your browser
+
+The [web apps](https://thomasrohde.github.io/nendo-apps/) are the same apps as the `.nendo` files, exported by Nendo as web
+pages. Each one runs Nendo's own engine in the browser: screens, calculations, Studio, history and
+the app's views work as they do in Nendo.
+
+- **Your changes stay in your browser.** It keeps your copy of each app, so you carry on where you
+  left off. Nothing you change reaches the site or anyone else.
+- **Keep your work** with **Download file** in the file menu. It saves your copy as a `.nendo`
+  file, which opens in Nendo too.
+- **Install an app.** Edge and Chrome offer to install one, and it then opens in a window of its
+  own, offline too.
+- **Or take a page with you.** Each release also carries every app as one `.html` file, such as
+  [Garden.html](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Garden.html). Double-click it and it opens in your browser, with no
+  server and no network.
+- **What a page cannot do:** there is no agent, so the apps made with an agent can be explored and
+  edited by hand but not asked for more. A browser that keeps nothing, such as a private window,
+  keeps your changes only until it closes.
+
+The [Web pages guide](https://thomasrohde.github.io/nendo/docs/web-pages/) says more, including how
+to bring the changes made in a page back into a file in Nendo.
 
 ## Add a view to a file of your own
 

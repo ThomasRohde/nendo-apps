@@ -25,8 +25,9 @@ Decision standing first, author and let the person accept, and record exact chec
 - Run every lane, `pwsh ./tools/Test-Apps.ps1`, now and then, and after the host changes its view
   contract, view kit or tokens. The host's `Test-Production.ps1 -WithApps` runs it against the
   host it just built.
-- A release is `pwsh ./tools/Build-Release.ps1 -Publish`. It publishes to the world, so run it
-  only when the owner asks. A new app or demo file needs its row in `README.md`.
+- A release is `pwsh ./tools/Build-Release.ps1 -Publish`. It publishes to the world, and its
+  web apps go on GitHub Pages, so run it only when the owner asks. A new app or demo file needs
+  its row in `README.md` and its card in `site/index.html`.
 - When the kit changes in the host, copy `../nendo/tools/view-kit/nendo-view-kit.js` into every
   package here that carries it, and raise those packages' versions.
 

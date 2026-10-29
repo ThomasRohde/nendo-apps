@@ -52,16 +52,33 @@ node ../nendo/tools/Put-NendoPackage.mjs extensions/gantt
 The person accepts the proposal in Nendo. See the host's
 [Authoring a custom view](https://github.com/ThomasRohde/nendo/blob/main/docs/custom-view-authoring.md).
 
+## Web pages and the web app site
+
+`pwsh ./tools/Build-WebPages.ps1` exports every tracked demo file the way Nendo's
+**File › Web page…** does, with the host's own export code (`tools/web-export/Export.cs`, run
+against copies): one page each in `artifacts/web/pages/<Name>.html`, and one web app each in
+`artifacts/web/site/<slug>/`, whose icons are the file's own picture. The runtime is the host's
+browser host page, `../nendo/artifacts/browser-host/Nendo.html`, built by its
+`tools/Build-BrowserHost.ps1` when missing; `-RebuildRuntime` builds it again, which a host change
+to the Engine or the Workbench needs.
+
+`site/index.html` is the site's front page. The build stops when an exported app has no link on it,
+or a link has no app, so a new demo file needs its card there as well as its row in the README.
+
 ## Making a release
 
-A release carries every tracked file under `workspace/` and every package under `extensions/` as
-`<folder>.zip`, with `SHA256SUMS.txt`. Close the demo files in Nendo first: an open file is
+A release carries every tracked file under `workspace/`, each of them as a web page, every package
+under `extensions/` as `<folder>.zip`, the web app site as `site.zip`, and `SHA256SUMS.txt`.
+Publishing it runs `.github/workflows/pages.yml`, which puts `site.zip` on GitHub Pages at
+https://thomasrohde.github.io/nendo-apps/. Close the demo files in Nendo first: an open file is
 refused by name.
 
 ```powershell
 pwsh ./tools/Build-Release.ps1            # collect into artifacts/release/ only
 pwsh ./tools/Build-Release.ps1 -Publish   # and create the GitHub release v<yyyy.MM.dd>
 ```
+
+A second release on one day needs its own `-Tag`, such as `-Tag v2026.10.29.2`.
 
 The README links to `releases/latest/download/<name>`, so its links follow the newest release.
 A new demo file or package needs a row in the README too.

@@ -1,0 +1,41 @@
+# Publishes the web apps on GitHub Pages: the site.zip that tools/Build-Release.ps1 attaches to a
+# release, built from the demo files by the host's own web export. Nothing is built here.
+name: Web apps
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download the site from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh release download $TAG --repo "$GITHUB_REPOSITORY" --pattern site.zip --dir .
+          mkdir _site
+          unzip -q site.zip -d _site
+          test -f _site/index.html
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
