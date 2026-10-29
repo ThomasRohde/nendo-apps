@@ -13,8 +13,8 @@ live planner are in the `nendo` repository's `workspace/`.
 | `Manuscript.nendo` | A new file of the Manuscript app (File > New manuscript, ADR-0022): the owner's paper in progress, *Malleable Software in One File: Nendo as a Case Study*, with real screenshots. | Yes |
 | `Milo.nendo` | A Manuscript file holding the owner's picture book *Milo and the Paper Boat*. | Yes |
 | `Clay.nendo` | [Clay](../extensions/clay/README.md), a collect-anything app that starts empty and grows its own shape. | Yes |
-| `Billable.nendo`, `Desk.nendo`, `Envelope.nendo` | Demo files with no package source in this repository: what they hold is in the file itself. | Yes |
-| `Brandkits.nendo`, `Sketchboard.nendo`, `Dynamo.nendo`, `Casefile.nendo` | The owner's files, kept out of git by `.git/info/exclude` until the owner adds them. | No |
+| `Brandkits.nendo` | Brand kits made with the launched agent, with the [Brandkits package](../extensions/brandkits/nendo-package.json) in the file. | Yes |
+| `Billable.nendo`, `Envelope.nendo`, `Desk.nendo`, `Sketchboard.nendo`, `Dynamo.nendo`, `Casefile.nendo` | Apps an agent built in the file, with no package source in this repository: what they hold is in the file itself. | Yes |
 
 ## Rules
 
@@ -24,13 +24,10 @@ live planner are in the `nendo` repository's `workspace/`.
 - Host-owned sidecars (`-wal`, `-shm`, journal, write-owner) belong to Nendo while
   it holds a file open. `.gitignore` keeps them out of git; leave them alone.
 
-## What is in git, and what is not
+## What is in git
 
-The owner's files that are not tracked are excluded in `.git/info/exclude`, not ignored.
-`git clean -xdf` would delete them with every other untracked file, so do not run one here
-without looking.
-
-The demo files are tracked. They change only when somebody rebuilds them, and they are
+Every file here is tracked, and every one is released: `tools/Build-Release.ps1` copies them
+into a GitHub release, and the README links to them there. The demo files are tracked. They change only when somebody rebuilds them, and they are
 worth still having after a sweep.
 
 The host's `tools/Test-BinaryAssets.ps1`, which `tools/Test-Apps.ps1` runs over this repository, opens every tracked file here and checks the SQLite

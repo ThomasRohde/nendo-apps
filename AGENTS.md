@@ -4,7 +4,8 @@
 
 The apps for Nendo, moved out of the host's repository under
 [ADR-0040](https://github.com/ThomasRohde/nendo/blob/main/docs/decisions/0040-apps-live-in-their-own-repository.md).
-`README.md` lists them. The host checkout sits beside this one, at `../nendo`, and is the
+`README.md` is for the people who download them; `CONTRIBUTING.md` lists the packages, their
+demo files and lanes, and how a release is made. The host checkout sits beside this one, at `../nendo`, and is the
 authority for everything an app relies on: read its `AGENTS.md`, `docs/vision.md`, the
 accepted ADRs and `docs/contracts/custom-views.md` there. An app never needs a change to the
 host to work; when it does, that is a host change made and gated in `../nendo`.
@@ -24,6 +25,8 @@ Decision standing first, author and let the person accept, and record exact chec
 - Run every lane, `pwsh ./tools/Test-Apps.ps1`, now and then, and after the host changes its view
   contract, view kit or tokens. The host's `Test-Production.ps1 -WithApps` runs it against the
   host it just built.
+- A release is `pwsh ./tools/Build-Release.ps1 -Publish`. It publishes to the world, so run it
+  only when the owner asks. A new app or demo file needs its row in `README.md`.
 - When the kit changes in the host, copy `../nendo/tools/view-kit/nendo-view-kit.js` into every
   package here that carries it, and raise those packages' versions.
 

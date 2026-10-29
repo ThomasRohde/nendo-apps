@@ -1,52 +1,96 @@
 # Nendo apps
 
-Apps for [Nendo](https://github.com/ThomasRohde/nendo): custom-view packages, the tools that
-build their demo files, their lanes, and the demo files themselves. Nendo's own repository keeps
-the host and two reference apps, Systems Lens and Swarm
-([ADR-0040](https://github.com/ThomasRohde/nendo/blob/main/docs/decisions/0040-apps-live-in-their-own-repository.md)).
+Ready-made apps for [Nendo](https://thomasrohde.github.io/nendo/), the desktop app where an
+application and its data live together in one `.nendo` file. Each app here is a single file:
+download it, open it in Nendo, and it works. Its record types, screens and views are all inside
+the file, with example data to try them on.
 
-| App | Package | Demo file | Lane |
-| --- | --- | --- | --- |
-| Dependency graph | [`extensions/dependency-graph`](extensions/dependency-graph/README.md) | none | `Review-NendoGraph.ps1` |
-| Work dependencies | [`extensions/work-dependencies`](extensions/work-dependencies/README.md) | none | `Review-WorkDependencies.ps1` |
-| Gantt | [`extensions/gantt`](extensions/gantt/README.md) | none | `Review-Gantt.ps1` |
-| Capability Atlas | [`extensions/bcm-atlas`](extensions/bcm-atlas/README.md) | `workspace/BCM.nendo` | `Review-BcmAtlas.ps1` |
-| Archi | [`extensions/archi`](extensions/archi/README.md) | `workspace/Archi.nendo` | `Review-ArchiWorkbench.ps1` |
-| Manuscript | [`extensions/manuscript`](extensions/manuscript/README.md) | `workspace/Manuscript.nendo`, `Milo.nendo` | `Review-Manus.ps1` |
-| Deck | [`extensions/deck`](extensions/deck/README.md) | `workspace/Deck.nendo` | `Review-Deck.ps1` |
-| Brandkits | [`extensions/brandkits`](extensions/brandkits/README.md) | kept by the owner | `Review-Brandkits.ps1` |
-| Garden | [`extensions/garden`](extensions/garden/README.md) | `workspace/Garden.nendo` | `Review-Garden.ps1` |
-| Clay | [`extensions/clay`](extensions/clay/README.md) | `workspace/Clay.nendo` | none |
+## Get started
 
-## The host beside it
+1. **Install Nendo.** It runs on Windows (x64). Nendo is not offered as a download
+   yet: you build the installer from source, as the
+   [Getting started guide](https://thomasrohde.github.io/nendo/docs/getting-started/) describes.
+2. **Download an app** from the table below. Every link fetches the file from the
+   [latest release](https://github.com/ThomasRohde/nendo-apps/releases/latest).
+3. **Open it.** Double-click the file, or choose **File › Open** in Nendo. The app's screens are
+   under **Use**.
+4. **Make it yours.** The example data is made up. When you want to start for real, choose
+   **File › New empty copy…** (an app may give it its own name, such as **New Archi model…**).
+   You get a new file with the same app and only the settings and starter records the app keeps,
+   while the example file stays as it was.
 
-This repository has no copy of Nendo's tooling. Every lane and builder uses the Nendo checkout
-beside it, `../nendo`, or the one `NENDO_HOST` names: its built view API
-(`src/Nendo.Workbench/dist/_nendo/api.js`), the fixture broker (`tools/Graph-FixtureServer.mjs`),
-the view kit and tokens, the package uploader (`tools/Put-NendoPackage.mjs`) and the MCP client.
-`tools/Host.ps1` and `tools/host.mjs` find it. Build its Workbench once
-(`npm --prefix ../nendo/src/Nendo.Workbench run build`); a lane builds it when it is missing.
+Nendo is a research project, not a supported product. Read its
+[status](https://thomasrohde.github.io/nendo/status/) before you rely on it, and keep copies of
+files that matter.
 
-## Running the lanes
+## The apps
 
-From the repository root, in PowerShell:
+### Write, plan and keep
 
-```powershell
-pwsh ./tools/Test-Apps.ps1                 # every lane
-pwsh ./tools/Test-Apps.ps1 -Lane Gantt,Deck  # some of them
-```
+| App | What it does | Download |
+| --- | --- | --- |
+| **Garden** | Markdown notes in a tree. `[[links]]`, `#tags` and `- [ ]` tasks become records, and a living graph shows how the notes connect. | [Garden.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Garden.nendo) |
+| **Manuscript** | Write a book or paper as one quiet continuous page, kept paragraph by paragraph, and typeset it. The example is a paper in progress about Nendo. | [Manuscript.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Manuscript.nendo) |
+| **Milo** | The same Manuscript app holding a picture book, *Milo and the Paper Boat*. | [Milo.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Milo.nendo) |
+| **Deck** | Slide decks with twenty-one layouts and six templates. Present with a presenter console, and export to HTML or PowerPoint. | [Deck.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Deck.nendo) |
+| **Clay** | Collect anything. Make shelves and fill them; when a detail has no place yet, Clay proposes one. | [Clay.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Clay.nendo) |
+| **Billable** | A freelancer's workspace: clients, projects, time, expenses, invoices and payments. | [Billable.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Billable.nendo) |
+| **Envelope** | A personal zero-based budget: give every amount a job, set money aside, and reconcile your accounts. | [Envelope.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Envelope.nendo) |
 
-Garden and Manuscript need their node packages first: `npm ci --prefix tools/garden` and
-`npm ci --prefix tools/manus`. Nendo's own gate runs this script with
-`pwsh ./tools/Test-Production.ps1 -WithApps`.
+### Model and map
 
-## Putting an app into a file
+| App | What it does | Download |
+| --- | --- | --- |
+| **Archi** | An ArchiMate 3.2 modeller in the manner of Archi: the model tree, diagrams, properties and analysis, offline in one file. | [Archi.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Archi.nendo) |
+| **Capability Atlas** | A business capability map of a fictional company, with maturity heatmaps, assessments over time and application coverage. | [BCM.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/BCM.nendo) |
 
-With Nendo running, the file open and agent access at **Shape app**:
+### Made with an agent
 
-```powershell
-node ../nendo/tools/Put-NendoPackage.mjs extensions/gantt
-```
+These apps are built to work with a coding agent that you start from Nendo's **Agent** page,
+such as Claude Code, Codex or GitHub Copilot CLI. You write a line about what you want, the agent
+drafts it in the file, and you pick and accept what you keep. The
+[Agents guide](https://thomasrohde.github.io/nendo/docs/agents/) explains how to set one up.
+Everything else in these files works without an agent.
 
-The person accepts the proposal in Nendo. See the host's
-[Authoring a custom view](https://github.com/ThomasRohde/nendo/blob/main/docs/custom-view-authoring.md).
+| App | What it does | Download |
+| --- | --- | --- |
+| **Brandkits** | Brand kits: colours, typefaces, logos and samples, with every contrast ratio checked against WCAG 2.2. Deck imports them. | [Brandkits.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Brandkits.nendo) |
+| **Sketchboard** | Boxes-and-arrows diagrams. Ask for a whole board, or select a part and choose between the agent's variants. | [Sketchboard.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Sketchboard.nendo) |
+| **Dynamo** | Stock-and-flow models, simulated live as you move the sliders, with scenarios and experiments. | [Dynamo.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Dynamo.nendo) |
+| **Casefile** | An investigation wall: claims, sources with exact quotes, evidence for and against, and a brief written from what survives. | [Casefile.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Casefile.nendo) |
+| **Desk** | Hand research and writing work to an agent, follow its steps, answer its questions and review what it delivers. | [Desk.nendo](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/Desk.nendo) |
+
+## Add a view to a file of your own
+
+Some apps are views you add to a file you already have, rather than files of their own. Each
+release also carries every view as a `.zip`:
+
+| View | What it draws | Download |
+| --- | --- | --- |
+| **Gantt** | One record type on a time line, from a start date to an end date. | [gantt.zip](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/gantt.zip) |
+| **Dependency graph** | Records as nodes and a link record type as arrows, with pan, zoom and a text list. | [dependency-graph.zip](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/dependency-graph.zip) |
+| **Work dependencies** | Work items laid out in the order they block each other, with cycles and the longest chain marked. | [work-dependencies.zip](https://github.com/ThomasRohde/nendo-apps/releases/latest/download/work-dependencies.zip) |
+
+The views of the apps above are there too: `garden.zip`, `manuscript.zip`, `deck.zip`,
+`clay.zip`, `archi.zip`, `bcm-atlas.zip` and `brandkits.zip`.
+
+To add one, open your file and choose **Studio › Screens › Custom views › Import package…**, pick
+the `.zip`, and accept the change. Then choose **Add view…** on its card to say which record
+type it draws and which fields it shows, and accept that too. The same steps bring a newer version of a view into a file you already use: your
+records stay as they are.
+
+A view's code runs inside Nendo and can read and change the file it is in. Import only views you
+trust; the [Custom views guide](https://thomasrohde.github.io/nendo/docs/custom-views/) says what
+a view can do and how to switch views off.
+
+## Licence
+
+The apps are MIT-licensed; see [LICENSE](LICENSE). Some views carry third-party libraries in a
+`vendor` folder, each under its own licence: elkjs (Eclipse Public License 2.0) in Work
+dependencies and Archi, d3 (ISC) and Mermaid (MIT) in Garden. Archi lists the further libraries it
+builds in under `extensions/archi/THIRD-PARTY.txt`.
+
+## Building the apps
+
+The source of each view is in [`extensions/`](extensions/). To change an app, run its tests, or
+make a release, see [CONTRIBUTING.md](CONTRIBUTING.md).
