@@ -10,6 +10,7 @@ live planner are in the `nendo` repository's `workspace/`.
 | `Archi.nendo` | An ArchiMate 3.2 model with the [Archi workbench](../extensions/archi/README.md) in the file. Built by `tools/Build-Archi.mjs`. | Yes |
 | `Garden.nendo` | [Garden](../docs/design/garden.md), a garden of Markdown notes whose `[[links]]`, `#tags` and `- [ ]` tasks are records, with the [Garden view](../extensions/garden/README.md) (reading first, a living d3 graph) and its own agent skill in the file. Built by `tools/Build-Garden.mjs`. | Yes |
 | `Deck.nendo` | [Deck](../extensions/deck/README.md): slide decks with twenty-one layouts, six templates, brand kits from Brandkits, Present with a presenter console and rehearsal, and HTML and PowerPoint export, with an example deck and its own agent skill in the file. Built by `tools/Build-Deck.mjs`. | Yes |
+| `Slip.nendo` | [Slip](../extensions/slip/README.md): a Smalltalk environment whose classes and methods are records, with four example classes and the Start here page. Built by `tools/Build-Slip.mjs`. | Yes |
 | `Manuscript.nendo` | A new file of the Manuscript app (File > New manuscript, ADR-0022): the owner's paper in progress, *Malleable Software in One File: Nendo as a Case Study*, with real screenshots. | Yes |
 | `Clay.nendo` | [Clay](../extensions/clay/README.md), a collect-anything app that starts empty and grows its own shape. | Yes |
 | `Brandkits.nendo` | Brand kits made with the launched agent, with the [Brandkits package](../extensions/brandkits/nendo-package.json) in the file. | Yes |
