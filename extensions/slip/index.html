@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Slip</title>
+  <link rel="stylesheet" href="slip.css">
+</head>
+<body>
+  <div id="app" aria-busy="true">
+    <nav id="rail" aria-label="Workspace pages">
+      <div class="rail-head"><span class="mark" aria-hidden="true">S</span><div><strong>Slip</strong><small id="tally">Starting…</small></div></div>
+      <button id="new-page" type="button" class="new-page">New page</button>
+      <ul id="pages"></ul>
+      <p class="keys" aria-label="Keys">
+        <span><kbd>Ctrl</kbd>+<kbd>D</kbd> Do it</span>
+        <span><kbd>Ctrl</kbd>+<kbd>P</kbd> Print it</span>
+        <span><kbd>Ctrl</kbd>+<kbd>.</kbd> Stop</span>
+        <span><kbd>Ctrl</kbd>+<kbd>S</kbd> Keep the page</span>
+      </p>
+    </nav>
+    <main id="main">
+      <div id="notices"></div>
+      <div id="own-toolbar" class="own-toolbar" hidden>
+        <button type="button" data-command="doit">Do it</button>
+        <button type="button" data-command="printit">Print it</button>
+        <button type="button" data-command="stop">Stop</button>
+      </div>
+      <header class="page-head">
+        <input id="title" maxlength="120" aria-label="Page title" autocomplete="off" spellcheck="false">
+        <span id="saved" class="saved" aria-live="polite"></span>
+        <button id="delete-page" type="button" class="quiet">Delete page</button>
+      </header>
+      <textarea id="editor" spellcheck="false" autocomplete="off" aria-label="Workspace: Smalltalk to evaluate"></textarea>
+      <div id="result" class="result" role="status" hidden></div>
+      <section id="transcript-pane" aria-label="Transcript">
+        <header><h2>Transcript</h2><button id="clear-transcript" type="button" class="quiet">Clear</button></header>
+        <pre id="transcript" tabindex="0"></pre>
+      </section>
+    </main>
+  </div>
+  <p id="status" role="status" aria-live="polite"></p>
+  <script src="/_nendo/api.js"></script>
+  <script type="module" src="slip.mjs"></script>
+</body>
+</html>
