@@ -146,3 +146,5 @@ kbd{font:inherit;font-size:.72rem;padding:0 4px;border:1px solid var(--line-stro
 .agent-queue li{margin-bottom:6px}
 .agent-queue pre{margin:0 0 4px;padding:6px 8px;border-radius:6px;background:var(--surface-raised);font:12.5px/1.45 var(--mono);white-space:pre-wrap;max-height:9em;overflow:auto}
 .agent-queue button{padding:3px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-raised);font-size:.85rem;margin-right:6px}
+.world-bar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+#world{flex:1 1 auto;width:100%;min-height:240px;border:1px solid var(--line);border-radius:8px;background:var(--canvas);touch-action:none;display:block}

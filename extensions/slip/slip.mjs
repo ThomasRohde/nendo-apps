@@ -10,6 +10,7 @@ import { createBridge } from './bridge.mjs';
 import { createAgentQueue, SETTING } from './agent.mjs';
 import { classNamed as classOfWord, KEYS, KEYS_SHIFTED, stoppedTitle, frameLabel } from './tools.mjs';
 import { createBrowser, createInspector, createDebugger } from './panes.mjs';
+import { createDisplay } from './display.mjs';
 
 const nendo = window.nendo ?? null;
 const $ = id => document.getElementById(id);
@@ -54,10 +55,10 @@ let agent = null;
 let capturing = null;         // the Transcript text an agent's evaluation writes
 // What the lane reads: whether Slip has started, and its image.
 window.slip = { ready: false, get image() { return image; }, get persisting() { return persisting; }, get running() { return Boolean(running); },
-  get stopped() { return Boolean(stopped); }, get debugging() { return Boolean(debug?.process); } };
+  get stopped() { return Boolean(stopped); }, get debugging() { return Boolean(debug?.process); }, get display() { return display; } };
 let tab = 'workspace';
 let activeEditor = 'editor';  // the text area Do it, Print it and the others act on
-let browser = null, inspector = null, debug = null;
+let browser = null, inspector = null, debug = null, display = null;
 // A run that stopped for the debugger, shown as a notifier under its text area, and where a
 // run the debugger has came from: { proc, id, how, source, start, end }.
 let stopped = null;
@@ -183,6 +184,7 @@ async function boot() {
   });
   vm = image.vm;
   vm.hooks.request = createBridge(vm, { nendo, objects, canKeep: () => persisting && !missing.includes(E.object) });
+  vm.hooks.display = display.hook;
   const started = performance.now();
   const texts = await Promise.all(KERNEL_FILES.map(async name => {
     const answer = await fetch(new URL(`kernel/${name}`, import.meta.url));
@@ -449,7 +451,8 @@ function takeSource(editor) {
 }
 
 // Each text area shows what it evaluated in its own box; in the inspector, self is the object.
-const RESULT_BOX = { editor: 'result', 'i-eval': 'i-result', 'b-code': 'b-problem' };
+const RESULT_BOX = { editor: 'result', 'i-eval': 'i-result', 'b-code': 'b-problem', world: 'w-result' };
+const EDITORS = ['editor', 'i-eval', 'b-code'];
 
 /** Runs an evaluation to its end or its stop, with Stop offered meanwhile. */
 async function track(evaluation) {
@@ -457,6 +460,8 @@ async function track(evaluation) {
   renderRunning();
   let outcome;
   try { outcome = await evaluation; } finally { running = null; renderRunning(); }
+  // A run may have changed what the World shows, or opened it.
+  if (display.open) display.refresh();
   browser.render();
   if (inspector.open) inspector.render();
   renderTally();
@@ -480,6 +485,11 @@ function finish(outcome, origin) {
   const { id, how, source, start, end } = origin;
   const editor = $(id);
   if (outcome.suspended) { showStopped(outcome.suspended, origin); return; }
+  if (how === 'world') {
+    if (outcome.error) showError(outcome.error, 0, 'world'); else $('w-result').hidden = true;
+    display.resume();
+    return;
+  }
   if (outcome.error) { showError(outcome.error, start, id); return; }
   if (how === 'inspect') { $(RESULT_BOX[id]).hidden = true; inspector.inspect(outcome.value); return; }
   const printed = image.printString(outcome.value, 1000);
@@ -511,7 +521,9 @@ function showStopped(proc, origin) {
 function dropStopped() {
   if (!stopped) return;
   const problem = image.abandon(stopped.proc);
+  const world = stopped.how === 'world';
   stopped = null;
+  if (world) display.resume();
   if (problem) say(`An ensure: block failed: ${problem}`, { problem: true });
 }
 
@@ -554,8 +566,9 @@ function debugIt() {
 function debugEnded(outcome, how) {
   const origin = debugging;
   debugging = null;
-  showTab(origin?.id === 'b-code' ? 'browser' : 'workspace');
+  showTab(origin?.id === 'b-code' ? 'browser' : origin?.id === 'world' ? 'world' : 'workspace');
   if (!origin) return;
+  if (how === 'abandon' && origin.how === 'world') { $('w-result').hidden = true; display.resume(); return; }
   if (how === 'abandon') { showResult('Abandoned.', 0, origin.id); return; }
   finish(outcome, origin);
 }
@@ -607,14 +620,15 @@ function run(command) {
 }
 
 function showTab(name) {
-  tab = name === 'browser' || (name === 'debugger' && debug.process) ? name : 'workspace';
+  tab = name === 'browser' || name === 'world' || (name === 'debugger' && debug.process) ? name : 'workspace';
   if (tab !== 'debugger') remember('slip.tab', tab);
-  for (const pane of ['workspace', 'browser', 'debugger']) {
+  for (const pane of ['workspace', 'browser', 'world', 'debugger']) {
     $(`${pane}-pane`).hidden = tab !== pane;
     $(`tab-${pane}`).setAttribute('aria-selected', String(tab === pane));
   }
   if (activeEditor !== 'i-eval' && tab !== 'debugger') activeEditor = tab === 'browser' ? 'b-code' : 'editor';
   if (tab === 'browser') browser.render();
+  if (tab === 'world') display.refresh();
 }
 
 // ---- The agent -----------------------------------------------------------------------
@@ -754,6 +768,7 @@ function renderRunning() {
 
 function applyTheme(theme) {
   if (theme?.mode === 'light' || theme?.mode === 'dark') document.documentElement.dataset.theme = theme.mode;
+  display?.refresh();
 }
 
 // ---- Wiring --------------------------------------------------------------------------
@@ -785,12 +800,49 @@ $('title').addEventListener('keydown', event => { if (event.key === 'Enter') { e
 $('new-page').addEventListener('click', () => { const page = newPage(); show(page); savePage(page); $('editor').focus(); });
 $('delete-page').addEventListener('click', deletePage);
 $('clear-transcript').addEventListener('click', () => { transcriptText = ''; $('transcript').textContent = ''; });
-for (const id of Object.keys(RESULT_BOX)) $(id).addEventListener('focus', () => { activeEditor = id; });
+for (const id of EDITORS) $(id).addEventListener('focus', () => { activeEditor = id; });
 $('tab-workspace').addEventListener('click', () => showTab('workspace'));
 $('tab-browser').addEventListener('click', () => showTab('browser'));
 $('tab-debugger').addEventListener('click', () => showTab('debugger'));
+$('tab-world').addEventListener('click', () => showTab('world'));
+$('w-cards').addEventListener('click', openCards);
+$('w-clear').addEventListener('click', () => worldDo('World removeAllMorphs'));
 $('own-toolbar').addEventListener('click', event => { const command = event.target.closest('button')?.dataset.command; if (command) run(command); });
 window.addEventListener('pagehide', () => { const page = currentPage(); if (page) { page.source = $('editor').value; savePage(page); } });
+
+display = createDisplay({ image: () => image, canvas: $('world'),
+  show: () => showTab('world'),
+  visible: () => tab === 'world' && !document.hidden,
+  dark: () => document.documentElement.dataset.theme === 'dark',
+  stopped: proc => showStopped(proc, { id: 'world', how: 'world', source: '', start: 0, end: 0 }),
+  problem: error => showError(error, 0, 'world') });
+
+/** Evaluates a line for the World's own buttons, as a run Stop reaches. */
+async function worldDo(source) {
+  if (running) { say('Slip is still running. Press Ctrl+. to stop it.'); return null; }
+  dropStopped();
+  const outcome = await track(image.evaluate(source));
+  if (outcome.suspended) showStopped(outcome.suspended, { id: 'world', how: 'world', source, start: 0, end: 0 });
+  else if (outcome.error) showError(outcome.error, 0, 'world');
+  else $('w-result').hidden = true;
+  return outcome;
+}
+
+/** Open Cards: files the app in from the package when the file lacks it (so it is kept as records), then opens it. */
+async function openCards() {
+  if (running) { say('Slip is still running. Press Ctrl+. to stop it.'); return; }
+  if (!classNamed('CardsBoard')) {
+    try {
+      const answer = await fetch(new URL('apps/Cards.st', import.meta.url));
+      if (!answer.ok) throw new Error(`apps/Cards.st did not load (${answer.status})`);
+      const result = image.fileIn(await answer.text(), 'Cards.st');
+      if (result.errors.length) throw new Error(result.errors[0]);
+      transcript(`Cards filed in: ${plural(result.methods, 'method')}${persisting ? ', kept in this file' : ''}.\n`);
+      browser.render();
+    } catch (error) { say(`Slip could not file in Cards: ${error.message}`, { problem: true }); return; }
+  }
+  await worldDo('CardsBoard open');
+}
 
 browser = createBrowser({ image: () => image, h, say, remember, recall, changed: () => renderTally() });
 inspector = createInspector({ image: () => image, h, say,

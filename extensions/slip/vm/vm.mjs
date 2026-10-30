@@ -133,6 +133,16 @@ const NAMES = {
     ['SystemDictionary', 'Object', '', 'fixed'],
     ['Random', 'Object', '', 'fixed'],
     ['Time', 'Object', '', 'fixed'],
+    ['Point', 'Object', 'x y', 'fixed'],
+    ['Rect', 'Object', 'origin corner', 'fixed'],
+    ['Color', 'Object', 'red green blue alpha', 'fixed'],
+    ['Canvas', 'Object', '', 'fixed'],
+    ['UIEvent', 'Object', 'type position button key shift', 'fixed'],
+    ['Morph', 'Object', 'bounds color owner submorphs', 'fixed'],
+    ['StringMorph', 'Morph', 'contents size bold', 'fixed'],
+    ['ButtonMorph', 'Morph', 'label action', 'fixed'],
+    ['TextFieldMorph', 'Morph', 'contents placeholder action', 'fixed'],
+    ['WorldMorph', 'Morph', 'focus pressed grabbed grabOffset grabOwner grabIndex grabPosition needsRedraw', 'fixed'],
   ],
 };
 
@@ -326,8 +336,9 @@ export class VM {
     if (!/^[A-Z][A-Za-z0-9_]*$/.test(name)) throw new SmalltalkError(`${name} is not a valid class name.`);
     const existingBinding = this.globals.get(name);
     let cls = existingBinding && existingBinding.f[1] instanceof STClass && !existingBinding.f[1].isMeta ? existingBinding.f[1] : null;
-    if (cls && cls.package === 'Kernel' && this.classes[name] === cls && (cls.superclass !== superclass || cls.format !== (format ?? cls.format))) {
-      throw new SmalltalkError(`${name} is a kernel class; its superclass and shape cannot change.`);
+    if (cls && cls.package === 'Kernel' && this.classes[name] === cls && (cls.superclass !== superclass || cls.format !== (format ?? cls.format) || cls.ivars.join(' ') !== ivars.join(' '))) {
+      // The primitives read a kernel object's fields by place, so its fields cannot change either.
+      throw new SmalltalkError(`${name} is a kernel class; its superclass, shape and instance variables cannot change.`);
     }
     const inheritedFormat = superclass ? (['variable', 'chars', 'bytes'].includes(superclass.format) ? superclass.format : 'fixed') : 'fixed';
     const fmt = format ?? inheritedFormat;
