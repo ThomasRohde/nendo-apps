@@ -1,10 +1,10 @@
 // Author Slip into an empty, host-created file: its purpose, Slip's three record types, the
 // package and the view that opens the file, then the example code and the Start here page.
-// Two change sets, the app first. Accepts only with --accept, which the host serves at
-// Unattended alone.
+// Two change sets, the app first. --upgrade instead brings a built file's package up to this
+// folder. Accepts only with --accept, which the host serves at Unattended alone.
 import crypto from 'node:crypto';
 import { hostTool } from './host.mjs';
-import { TITLE, PLANNERS, buildMutations } from './slip/definition.mjs';
+import { TITLE, PLANNERS, PACKAGE_ID, buildMutations, upgradeMutations } from './slip/definition.mjs';
 const { createNendoMcpClient } = await hostTool('Nendo-McpClient.mjs');
 const EXAMPLES_TITLE = 'Slip: the example classes and the Start here page';
 const args = process.argv.slice(2), option = name => args[args.indexOf(name) + 1];
@@ -19,8 +19,9 @@ const read = async uri => JSON.parse((await client.rpc('resources/read', { uri }
 const file = await read('nendo://application/manifest');
 if (PLANNERS.includes(file.applicationId)) throw Error('Refused: this endpoint is a development planner.');
 const examplesOnly = args.includes('--examples-only');
+const upgrade = args.includes('--upgrade');
 const entities = (await read('nendo://application/entities')).map(e => e.entityId ?? e);
-if (!examplesOnly && entities.length) throw Error('Refused: build only into an empty, newly created Slip file.');
+if (!examplesOnly && !upgrade && entities.length) throw Error('Refused: build only into an empty, newly created Slip file.');
 if (examplesOnly && !entities.includes('st.method')) throw Error('Refused: this file has no Slip record types yet. Build the app first.');
 if ((await read('nendo://application/proposals')).length) throw Error('Refused: this file already has pending proposals.');
 
@@ -41,6 +42,13 @@ async function send(title, mutations) {
 }
 
 // The examples need the record types, so they follow only once the app is in the file.
-if (examplesOnly) await send(EXAMPLES_TITLE, data);
+if (upgrade) {
+  const held = (await read('nendo://application/extensions')).find(p => p.packageId === PACKAGE_ID);
+  if (!held) throw Error(`Refused: this file does not carry ${PACKAGE_ID}. Build it first.`);
+  const { mutations, changed, removed, version } = await upgradeMutations(held);
+  console.log(`Upgrade ${held.version} -> ${version}: ${changed.length} changed (${changed.join(', ') || 'none'}), ${removed.length} removed (${removed.join(', ') || 'none'}).`);
+  if (changed.length || removed.length || held.version !== version) await send(`Slip: the package at ${version}`, mutations);
+  else console.log('The file already carries this package. Nothing sent.');
+} else if (examplesOnly) await send(EXAMPLES_TITLE, data);
 else if (await send(TITLE, definition)) await send(EXAMPLES_TITLE, data);
 else console.log('Accept the app first, then run this again with --examples-only to add the examples.');

@@ -1,6 +1,8 @@
 async page => {
   // A failure names the last check that passed, so a timeout says where it happened.
   const checks = [];
+  // Each check is also said as it passes, so a run that hangs shows where.
+  const passed = name => { checks.push(name); console.log(`check ${name}`); };
   try { return await (async () => {
   const assert = (ok, message) => { if (!ok) throw Error(message); };
   const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -30,10 +32,10 @@ async page => {
   const refusals = await page.evaluate(() => window.broker.chromeRefusals);
   assert(refusals.length === 0, 'Nendo refused Slip\'s toolbar: ' + JSON.stringify(refusals));
   const toolbars = await page.evaluate(() => window.broker.toolbars);
-  assert(toolbars.length > 0 && toolbars.at(-1).items.map(i => i.id).join(',') === 'doit,printit,stop', 'The toolbar must offer Do it, Print it and Stop.');
+  assert(toolbars.length > 0 && toolbars.at(-1).items.map(i => i.id).join(',') === 'doit,printit,inspectit,browseit,stop', 'The toolbar must offer Do it, Print it, Inspect it, Browse it and Stop.');
   assert(await frame.evaluate(() => getComputedStyle(document.getElementById('own-toolbar')).display === 'none'), 'With Nendo\'s toolbar offered, Slip draws no toolbar of its own.');
   assert(await frame.locator('#notices .notice').count() === 0, 'A file that is ready shows no notice.');
-  checks.push('mount');
+  passed('mount');
 
   // 2. Print it puts the printString after the selection and selects it; the examples run.
   const pageRecord = (await records('st.snippet'))[0];
@@ -43,7 +45,7 @@ async page => {
   await frame.waitForFunction(() => document.getElementById('editor').value.endsWith(' 10'));
   const selected = await editor().evaluate(e => e.value.slice(e.selectionStart, e.selectionEnd));
   assert(selected === ' 10', `Print it must select what it printed, and selected "${selected}".`);
-  checks.push('print it');
+  passed('print it');
 
   // 3. Ctrl+P and Ctrl+D in the editor, the caret's line when nothing is selected.
   await editor().fill('3 + 4\n100 factorial printString size');
@@ -55,13 +57,13 @@ async page => {
   await page.keyboard.press('Control+d');
   await idle();
   assert(await frame.locator('#result').isVisible() && (await frame.locator('#result').textContent()).includes('7'), 'Do it must show its result under the editor.');
-  checks.push('keys');
+  passed('keys');
 
   // 4. The page is kept: an edit reaches its record after the idle delay.
   await frame.waitForFunction(() => document.getElementById('saved').textContent === 'Kept in the file', null, { timeout: 5000 });
   const kept = (await records('st.snippet')).find(r => r.recordId === pageRecord.recordId);
   assert(kept.values['st.snippet.source'].includes('100 factorial printString size 158'), 'The page\'s record must hold what the editor holds.');
-  checks.push('page kept');
+  passed('page kept');
 
   // 5. A class and a method made in the Workspace become records, exactly as written.
   await write('Object subclass: #Greeter instanceVariableNames: \'name\' classVariableNames: \'\' package: \'Mine\'.\nGreeter compile: \'greet\n\t^#hello\' classified: \'greeting\'.\nGreeter new greet');
@@ -73,7 +75,7 @@ async page => {
   assert(greeter && greeter.values['st.class.instanceVariables'] === 'name' && greeter.values['st.class.package'] === 'Mine', 'Greeter must be kept with its variables and package.');
   const greet = (await records('st.method')).find(r => r.values['st.method.selector'] === 'greet');
   assert(greet.values['st.method.source'] === 'greet\n\t^#hello' && greet.values['st.method.className'] === 'Greeter' && greet.values['st.method.side'] === 'instance', 'greet must be kept with its exact source.');
-  checks.push('code kept');
+  passed('code kept');
 
   // 6. Code from outside Slip is compiled, live, and said so.
   await page.evaluate(() => {
@@ -87,7 +89,7 @@ async page => {
   await idle();
   assert(await editor().inputValue() === '14 triple 42', 'A method that came from outside must run.');
   assert((await frame.locator('#transcript').textContent()).includes('came in from outside Slip'), 'The Transcript must say that code came from outside.');
-  checks.push('outside code');
+  passed('outside code');
 
   // 7. A run that never ends leaves the page answering, and Stop ends it.
   await write('[true] whileTrue: [3 + 4]');
@@ -102,7 +104,7 @@ async page => {
   await command('stop');
   await idle();
   assert((await frame.locator('#result .title').textContent()) === 'Stopped.', 'Stop must end the run and say so.');
-  checks.push('stop');
+  passed('stop');
 
   // 8. An error shows its message and its trace.
   await write('Stack new pop');
@@ -110,14 +112,100 @@ async page => {
   await idle();
   const problem = await frame.locator('#result').textContent();
   assert(problem.includes('The stack is empty.') && problem.includes('Stack>>pop'), `An error must name itself and its trace: ${problem}`);
-  checks.push('error');
+  passed('error');
 
   // 9. Nendo's dark theme reaches the page.
   await page.evaluate(() => window.broker.pushTheme('dark'));
   await frame.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
   const background = await frame.evaluate(() => getComputedStyle(document.body).backgroundColor);
   assert(background !== 'rgb(249, 249, 250)', `The dark theme must change the canvas, which is ${background}.`);
-  checks.push('theme');
+  passed('theme');
+
+  // 11. The browser lists the file's packages, classes, protocols and methods, and a method
+  // edited and accepted there is compiled and kept, exactly as written.
+  const code = () => frame.locator('#b-code');
+  const values = id => frame.locator(`#${id} li`).evaluateAll(items => items.map(li => li.dataset.value));
+  const chosen = id => frame.locator(`#${id} li[aria-selected=true]`).evaluateAll(items => items.map(li => li.dataset.value).join(','));
+  const pick = (id, value) => frame.locator(`#${id} li[data-value="${value}"]`).click();
+  await frame.locator('#tab-browser').click();
+  assert(await frame.locator('#browser-pane').isVisible() && !await frame.locator('#workspace-pane').isVisible(), 'The Browser tab must show the browser in place of the Workspace.');
+  assert((await values('b-packages')).includes('Examples') && (await values('b-packages')).includes('Kernel'), 'The browser must list the Examples and Kernel packages.');
+  await pick('b-packages', 'Examples');
+  const exampleClasses = await values('b-classes');
+  assert(['Circle', 'Rectangle', 'Shape', 'Stack'].every(name => exampleClasses.includes(name)) && exampleClasses.includes('Integer'), `Examples must list its four classes and Integer, which it extends: ${exampleClasses}`);
+  assert(await frame.locator('#b-classes li.extended[data-value="Integer"]').count() === 1, 'A class a package only extends is marked as extended.');
+  await pick('b-classes', 'Stack');
+  assert((await code().inputValue()).startsWith('Object subclass: #Stack\n\tinstanceVariableNames: \'items\''), 'A class with no method chosen shows its definition.');
+  await pick('b-protocols', 'operations');
+  assert((await values('b-methods')).join(',') === 'pop,push:,top', `The operations protocol holds pop, push: and top: ${await values('b-methods')}`);
+  await pick('b-methods', 'push:');
+  assert(await code().inputValue() === 'push: anObject\n\t^items addLast: anObject', 'A chosen method shows its source.');
+  await code().fill('push: anObject\n\t"Put anObject on top."\n\t^items addLast: anObject');
+  await code().focus();
+  await page.keyboard.press('Control+s');
+  await page.waitForFunction(() => window.broker.records('st.method').find(r => r.recordId === 'st.method.stack-push')?.values['st.method.source'] === 'push: anObject\n\t"Put anObject on top."\n\t^items addLast: anObject', null, { timeout: 5000 });
+  assert(await frame.locator('#b-code').getAttribute('data-dirty') === 'false', 'An accepted method is no longer marked as changed.');
+  passed('browser accept');
+
+  // 12. A new method goes into the chosen protocol; a parse error is shown where it is and
+  // keeps nothing; an edit not accepted is dropped only on a second choice.
+  await frame.locator('#b-new-method').click();
+  await code().fill('peek\n\t^items isEmpty ifTrue: [nil] ifFalse: [items last]');
+  await frame.locator('#b-accept').click();
+  await page.waitForFunction(() => window.broker.records('st.method').some(r => r.values['st.method.className'] === 'Stack' && r.values['st.method.selector'] === 'peek' && r.values['st.method.protocol'] === 'operations'), null, { timeout: 5000 });
+  assert(await chosen('b-methods') === 'peek', 'The new method is chosen once it compiles.');
+  await frame.locator('#b-new-method').click();
+  await code().fill('broken\n\t^(1 + ');
+  await frame.locator('#b-accept').click();
+  assert(await frame.locator('#b-problem').isVisible() && /expected/i.test(await frame.locator('#b-problem').textContent()), 'A parse error must be shown under the code.');
+  assert(!(await records('st.method')).some(r => r.values['st.method.selector'] === 'broken'), 'A method that does not compile is not kept.');
+  await pick('b-methods', 'pop');
+  assert(await code().inputValue() === 'broken\n\t^(1 + ' && (await frame.locator('#status').textContent()).includes('not accepted'), 'The first choice away from an edit not accepted keeps it and says so.');
+  await pick('b-methods', 'pop');
+  assert((await code().inputValue()).startsWith('pop\n'), 'The second choice drops the edit and shows the method.');
+  passed('browser new method');
+
+  // 13. A class definition changed in the browser reshapes the class, keeps its methods
+  // working, and is kept; the comment is there to read.
+  await pick('b-classes', 'Stack');
+  await code().fill((await code().inputValue()).replace("instanceVariableNames: 'items'", "instanceVariableNames: 'items limit'"));
+  await frame.locator('#b-accept').click();
+  await page.waitForFunction(() => window.broker.records('st.class').find(r => r.recordId === 'st.class.stack')?.values['st.class.instanceVariables'] === 'items limit', null, { timeout: 5000 });
+  await frame.locator('#b-comment').click();
+  assert((await code().inputValue()).startsWith('A last-in, first-out stack'), 'Comment shows the class comment.');
+  passed('browser definition');
+
+  // 14. Inspect it opens the inspector on the result; a field opens the object it holds, and
+  // the inspector evaluates with self as the object.
+  await frame.locator('#tab-workspace').click();
+  await write('Stack new push: 7; push: 8; yourself');
+  await command('inspectit');
+  await idle();
+  await frame.waitForFunction(() => !document.getElementById('inspector').hidden);
+  assert(await frame.locator('#i-class').textContent() === 'Stack', 'The inspector shows the class of what it inspects.');
+  const labels = await frame.locator('#i-fields button').evaluateAll(items => items.map(b => b.dataset.label));
+  assert(labels.join(',') === 'items,limit', `A Stack's fields are items and limit: ${labels}`);
+  await frame.locator('#i-fields button[data-label="items"]').click();
+  assert(await frame.locator('#i-class').textContent() === 'OrderedCollection' && await frame.locator('#i-path').textContent() === 'self › items', 'A field opens the object it holds.');
+  await frame.locator('#i-back').click();
+  assert(await frame.locator('#i-class').textContent() === 'Stack', 'Back returns to the object before.');
+  await frame.locator('#i-eval').fill('self peek');
+  await frame.locator('#i-eval').evaluate(e => { e.focus(); e.setSelectionRange(0, e.value.length); });
+  await page.keyboard.press('Control+p');
+  await idle();
+  await frame.waitForFunction(() => document.getElementById('i-eval').value === 'self peek 8');
+  passed('inspector');
+
+  // 15. Browse it opens the browser on the class the caret is on.
+  await write('Circle radius: 2');
+  await editor().evaluate(e => { e.focus(); e.setSelectionRange(2, 2); });
+  await page.keyboard.press('Control+Shift+B');
+  await frame.waitForFunction(() => !document.getElementById('browser-pane').hidden);
+  assert(await chosen('b-classes') === 'Circle' && (await code().inputValue()).startsWith('Shape subclass: #Circle'), 'Browse it must show Circle\'s definition.');
+  await frame.locator('#i-close').click();
+  assert(await frame.locator('#inspector').isHidden(), 'Close hides the inspector.');
+  await frame.locator('#tab-workspace').click();
+  passed('browse it');
 
   // 10. A file without Slip's record types: Slip still runs, keeps nothing, and says how to
   // give the file the record types. This broker takes no proposals, so the button says so.
@@ -137,7 +225,7 @@ async page => {
   assert(await editor().inputValue() === '6 * 7 42', 'Slip must run in a file that cannot keep its work.');
   await frame.locator('#notices .notice.setup button').click();
   await frame.waitForFunction(() => document.getElementById('status').textContent.includes('cannot take a proposal'));
-  checks.push('no record types');
+  passed('no record types');
 
   assert(errors.length === 0, 'Browser exceptions: ' + errors.join(' | '));
   return { complete: true, checks, errors };
