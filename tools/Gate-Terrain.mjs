@@ -44,6 +44,18 @@ async page => {
   assert(mapSelect && mapSelect.options.length === fixture.records['tr.map'].length, `The map list does not name the ${fixture.records['tr.map'].length} maps: ${JSON.stringify(mapSelect)}`);
   checks.push('Nendo accepts the toolbar, which lists every map');
 
+  // The paper fits the frame: with the text pane and the side panel open, in a narrow window, the
+  // map's right edge stays inside the frame until the person zooms.
+  const window0 = page.viewportSize();
+  await page.setViewportSize({ width: 1100, height: window0?.height ?? 800 });
+  await settle();
+  const edges = await frame.evaluate(() => ({ text: !document.getElementById('text-pane').hidden,
+    wrap: document.getElementById('paper-wrap').getBoundingClientRect().right, svg: document.querySelector('#paper svg').getBoundingClientRect().right }));
+  assert(edges.text && edges.svg <= edges.wrap + 0.5, `In a 1100 px window the map's right edge is at ${edges.svg}, past the frame's ${edges.wrap}.`);
+  if (window0) await page.setViewportSize(window0);
+  await settle();
+  checks.push('the map fits the frame with the text pane open');
+
   // Geometry: on every map, each mark stands where its record says, measured from the SVG.
   const byId = list => new Map(list.map(r => [r.recordId, r]));
   const placements = fixture.records['tr.placement'], assessments = fixture.records['tr.assessment'], components = byId(fixture.records['tr.component']);
