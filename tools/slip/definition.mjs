@@ -62,6 +62,24 @@ const putFile = (packageId, file, expectedSha256) => {
       ...(offset === 0 ? { expectedSha256 } : { append: true }) }));
   return out;
 };
+// The host reads at most 262,144 bytes per request (limits.requestBodyBytes); a putFile carries up
+// to 70 KiB, about 96 KB as base64, so three of them already overflow a call. The rest of the
+// request (envelope, handle, lease, keys) fits in what the budget leaves.
+export const MUTATION_BYTES = 200_000;
+/** Operations in calls of at most 12 and at most MUTATION_BYTES of JSON, in order. */
+export const batches = (operations, description, first = 1) => {
+  const out = [];
+  let current = [], bytes = 0;
+  const flush = () => { if (current.length) out.push({ description: `${description} (${first + out.length})`, operations: current }); current = []; bytes = 0; };
+  for (const operation of operations) {
+    const size = Buffer.byteLength(JSON.stringify(operation));
+    if (current.length === 12 || (current.length && bytes + size > MUTATION_BYTES)) flush();
+    current.push(operation);
+    bytes += size;
+  }
+  flush();
+  return out;
+};
 /** The skill's one file. */
 export async function skillFile() {
   const bytes = await fs.readFile(SKILL_FILE);
@@ -120,7 +138,7 @@ export async function exampleRecords() {
   return { records, image };
 }
 
-/** Every operation of the build, in calls of at most 12, definition before data. */
+/** Every operation of the build, in calls of at most 12 and MUTATION_BYTES, definition before data. */
 export async function buildMutations() {
   const { manifest, files } = await packageFiles();
   const definition = [setPackage(manifest)];
@@ -129,13 +147,8 @@ export async function buildMutations() {
   definition.push(op('ui.addNode', { surfaceId: 'slip', nodeId: VIEW_NODE, parentNodeId: null, kind: 'extensionView', position: 0,
     properties: { definitionVersion: 3, title: 'Slip', packageId: manifest.packageId, opensFile: true } }));
   const data = (await exampleRecords()).records.map(r => op('data.createRecord', { entityId: r.entityId, recordId: r.recordId, values: r.values }));
-  const chunk = (operations, description) => {
-    const out = [];
-    for (let at = 0; at < operations.length; at += 12) out.push({ description: `${description} (${out.length + 1})`, operations: operations.slice(at, at + 12) });
-    return out;
-  };
   const types = typeMutations().map((mutation, i) => i === 0 ? { ...mutation, operations: [op('application.setPurpose', { purpose: PURPOSE }), ...mutation.operations] } : mutation);
-  return { definition: [...types, ...chunk(definition, 'Slip app')], data: chunk(data, 'Slip examples'), files, manifest };
+  return { definition: [...types, ...batches(definition, 'Slip app')], data: batches(data, 'Slip examples'), files, manifest };
 }
 
 /**
@@ -166,7 +179,7 @@ export async function upgradeMutations(held, { heldSkill = null, schema = null }
   }
   const types = schema ? missingEntities(schema) : [];
   const mutations = types.length ? typeMutations(types) : [];
-  for (let at = 0; at < operations.length; at += 12) mutations.push({ description: `Slip package ${manifest.version} (${mutations.length + 1})`, operations: operations.slice(at, at + 12) });
+  mutations.push(...batches(operations, `Slip package ${manifest.version}`, mutations.length + 1));
   return { mutations, changed, removed: removed.map(([path]) => path), types, version: manifest.version };
 }
 
