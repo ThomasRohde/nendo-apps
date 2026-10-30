@@ -7,7 +7,7 @@ import { VM, SmalltalkError, STClass } from './vm.mjs';
 export const KERNEL_FILES = [
   'Object.st', 'Boolean.st', 'Magnitude.st', 'Number.st', 'Character.st',
   'Collection.st', 'Sequenceable.st', 'OrderedCollection.st', 'String.st', 'Hashed.st',
-  'Stream.st', 'Block.st', 'Exception.st', 'Class.st', 'System.st', 'Nendo.st',
+  'Stream.st', 'Block.st', 'Exception.st', 'Class.st', 'System.st', 'Nendo.st', 'Display.st', 'Morph.st',
 ];
 
 /** Splits chunk-format text at single bangs; a doubled bang stands for one. */
@@ -143,6 +143,14 @@ export class Image {
    */
   evaluate(source, { slice = 8, yieldTo = defaultYield, receiver = null } = {}) {
     return this.continue(this.process(source, receiver), { slice, yieldTo });
+  }
+
+  /**
+   * Sends a message as a process of its own, in time slices as evaluate does: how the display
+   * hands the World an event. Answers a promise like evaluate's.
+   */
+  send(receiver, selector, args = [], { slice = 8, yieldTo = defaultYield } = {}) {
+    return this.continue(this.vm.newProcess(this.vm.sendContext(receiver, selector, args)), { slice, yieldTo });
   }
 
   /** A process for the doit that stops before its first statement, for Debug it. */

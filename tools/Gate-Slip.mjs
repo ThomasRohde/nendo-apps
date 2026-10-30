@@ -296,6 +296,52 @@ async page => {
   await frame.waitForFunction(() => document.getElementById('debugger-pane').hidden);
   passed('ask the agent');
 
+  // 21. Open Cards files the app in, keeps its classes as records and opens it in the World,
+  // which fills the canvas and draws in Nendo's theme. A card typed on the canvas, and a card
+  // dragged to the next column, are kept in the file as the board's st.object.
+  await frame.locator('#tab-workspace').click();
+  await frame.locator('#w-cards').evaluate(button => button.click());
+  await frame.waitForFunction(() => !document.getElementById('world-pane').hidden && window.slip.display.ops.some(op => op[0] === 'text' && op[1] === 'Cards'), null, { timeout: 10000 });
+  await page.waitForFunction(() => window.broker.records('st.method').some(r => r.values['st.method.className'] === 'CardsBoard' && r.values['st.method.selector'] === 'layout'), null, { timeout: 10000 });
+  assert((await records('st.class')).some(r => r.values['st.class.name'] === 'CardsCard' && r.values['st.class.package'] === 'Cards'), 'Cards\' classes must be kept as records.');
+  const slipPrint = source => frame.evaluate(source => window.slip.image.print(source), source);
+  const canvasBox = await frame.locator('#world').boundingBox();
+  const worldExtent = await slipPrint('World extent');
+  const [worldWidth, worldHeight] = worldExtent.split('@').map(Number);
+  assert(Math.abs(worldWidth - (canvasBox.width - 2)) <= 1 && Math.abs(worldHeight - (canvasBox.height - 2)) <= 1 && worldWidth > 600, `The World must take the canvas's size inside its border: ${worldExtent} for ${canvasBox.width}x${canvasBox.height}.`);
+  const backdrop = async () => frame.evaluate(() => window.slip.display.ops.find(op => op[0] === 'fill')?.[5]);
+  const bodyColour = async () => frame.evaluate(() => getComputedStyle(document.body).backgroundColor.replace('rgb(', 'rgba(').replace(')', ', 1)'));
+  assert(await backdrop() === await bodyColour(), `The World's background must be Nendo's canvas token: ${await backdrop()} and ${await bodyColour()}.`);
+  await page.evaluate(() => window.broker.pushTheme('light'));
+  await frame.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+  const light = await bodyColour();
+  await frame.waitForFunction(light => window.slip.display.ops.find(op => op[0] === 'fill')?.[5] === light, light, { timeout: 5000 });
+  await page.evaluate(() => window.broker.pushTheme('dark'));
+  // The colour is the token's, read when the World draws: a changed token reaches the morphs.
+  await frame.evaluate(() => { document.documentElement.style.setProperty('--canvas', '#ffaa00'); window.slip.display.refresh(); });
+  await frame.waitForFunction(() => window.slip.display.ops.find(op => op[0] === 'fill')?.[5] === 'rgba(255, 170, 0, 1)', null, { timeout: 5000 })
+    .catch(async () => { throw Error(`The World's background must follow the --canvas token: ${await backdrop()}`); });
+  await frame.evaluate(() => { document.documentElement.style.removeProperty('--canvas'); window.slip.display.refresh(); });
+  const onCanvas = async source => { const [x, y] = (await slipPrint(source)).split('@').map(Number); return [canvasBox.x + 1 + x, canvasBox.y + 1 + y]; };
+  const field = await onCanvas('(World submorphs first submorphs detect: [:m | m isKindOf: TextFieldMorph]) center');
+  await page.mouse.click(...field);
+  await page.keyboard.type('Buy milk');
+  await page.keyboard.press('Enter');
+  const board = async () => (await records('st.object')).find(r => r.values['st.object.name'] === 'cards')?.values['st.object.ston'] ?? '';
+  await page.waitForFunction(() => window.broker.records('st.object').some(r => r.values['st.object.name'] === 'cards' && r.values['st.object.ston'].includes('Buy milk')), null, { timeout: 5000 });
+  assert(await frame.evaluate(() => window.slip.display.ops.some(op => op[0] === 'text' && op[1] === 'Buy milk')), 'The new card must be drawn.');
+  const from = await onCanvas('World submorphs first columns first cards first center');
+  const to = await onCanvas('World submorphs first columns second bounds topLeft + (40 @ 30)');
+  await page.mouse.move(...from);
+  await page.mouse.down();
+  await page.mouse.move(from[0] + 40, from[1] + 10, { steps: 4 });
+  await page.mouse.move(...to, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForFunction(() => /^\[\[[^\]]*\],\['Drag this card to Doing'/.test(window.broker.records('st.object').find(r => r.values['st.object.name'] === 'cards')?.values['st.object.ston'] ?? ''), null, { timeout: 5000 });
+  assert((await board()).startsWith('[[\'Add a card: type it above, then press Enter\',\'Buy milk\'],[\'Drag this card to Doing\''), `The dragged card must be kept in Doing: ${await board()}`);
+  await frame.locator('#tab-workspace').click();
+  passed('world and cards');
+
   // 21. A file Slip built before kept objects and evaluations: code is kept as before, and a
   // notice offers the two later record types. This broker takes no proposals, so it says so.
   const remountWith = async next => {

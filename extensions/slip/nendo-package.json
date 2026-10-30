@@ -1,9 +1,9 @@
 {
   "packageId": "org.nendo.slip",
   "title": "Slip",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "entryPoint": "index.html",
-  "description": "A Smalltalk environment in the file. Evaluate in a Workspace, browse and change classes, inspect objects, debug a run, keep objects, and let an agent change and run the code; the classes and methods you make are kept as records.",
+  "description": "A Smalltalk environment in the file. Evaluate in a Workspace, browse and change classes, inspect objects, debug a run, keep objects, build apps on morphs in the World (Cards is one), and let an agent change and run the code; the classes and methods you make are kept as records.",
   "settings": [
     {
       "id": "agentEvaluations",

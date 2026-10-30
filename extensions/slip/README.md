@@ -53,6 +53,18 @@ A Smalltalk environment in a Nendo file. `workspace/Slip.nendo` opens on it (`sl
   **Run** or **Decline**, unless you turned on the setting **Run an agent's evaluations** (off by
   default, kept on each computer, also offered by the queue's own button). Slip writes the result,
   or the error and its stack, and the Transcript output back into the record.
+- **The World** tab shows morphs: `World open: aMorph`, or `aMorph openInWorld`. A morph draws
+  itself on a `Canvas` and takes the World's events: a click goes to the morph under it that
+  handles it, the keyboard to the one clicked that wants it, a draggable morph can be dropped on
+  one that wants it, and `step` runs a few times a second for a morph that wants steps. The kernel
+  has `Morph`, `StringMorph`, `ButtonMorph`, `TextFieldMorph` and `WorldMorph`, with `Point`
+  (`3 @ 4`), `Rect`, `Color` and `UIEvent`. A colour given as a Symbol (`#accent`, `#text`,
+  `#surface`) is Nendo's theme colour of that name, so the morph follows the light or dark theme.
+- **Cards** is an app on these morphs: a board of cards in three columns. **Open Cards**, in the
+  World tab, files it in from `apps/Cards.st` when the file lacks it, so its classes are kept as
+  records and can be read and changed in the Browser, then opens it (`CardsBoard open`). Type a card
+  and press Enter, drag a card to another column, press x to remove one. The board is kept as the
+  object named `cards`.
 - **Ask the agent**, in the debugger, sends your agent the stopped run's stack, with its methods
   as the file's records. Nendo asks you first; the reply goes to the Transcript.
 
@@ -76,6 +88,11 @@ A Smalltalk environment in a Nendo file. `workspace/Slip.nendo` opens on it (`sl
   context, and a return that passes an `ensure:` context runs its block. The VM has a few
   context primitives for this, and stops a process for the debugger when `defaultAction` finds
   no handler. A debugger step runs the process until the next send it is watching for.
+- `display.mjs` is the World tab's display. Each pointer or key event on the canvas becomes a
+  `UIEvent` that `WorldMorph>>handle:on:` takes in a process of its own, one at a time. A `Canvas`
+  primitive only adds a drawing operation to a list, which the view paints once the World has
+  drawn, so a frame never shows half drawn. The display primitives (`vm/primitives.mjs`) read the
+  canvas's size, measure text and answer the theme's colours from Nendo's tokens.
 - `bridge.mjs` answers `Nendo request:with:`: the primitive stops the process with the request's
   promise, and the image runs it on with the answer as the send's value, or signals an Error with
   the refusal. It also writes and reads STON, a subset of Smalltalk Object Notation, for kept
@@ -91,7 +108,7 @@ A Smalltalk environment in a Nendo file. `workspace/Slip.nendo` opens on it (`sl
 
 - The lane is `pwsh ./tools/Test-Apps.ps1 -Lane Slip` (`tools/Review-Slip.ps1`): the node tests
   in `tools/slip/` (kernel conformance, language, exceptions and debugger, records, package, browser and inspector,
-  bridge and agent), then `tools/Gate-Slip.mjs`
+  bridge and agent, display and Cards), then `tools/Gate-Slip.mjs`
   against the host's fixture broker.
 - `node tools/Build-Slip.mjs --endpoint http://127.0.0.1:PORT/mcp --accept` builds the app into
   an empty, host-created file at Unattended: the record types, the package and the view, then

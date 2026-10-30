@@ -32,7 +32,7 @@ A file may lack `st.object` and `st.evaluation`: Slip offers the person a propos
 - **Removing a method**: delete its record.
 - The dialect is Smalltalk-80 with Pharo's syntax (`{ }` arrays, `#[ ]` byte arrays, pragmas).
   Exceptions are ANSI's: `on:do:`, `ensure:`, `ifCurtailed:`, `signal:`, `retry`, `resume:`,
-  `pass`, `outer`. There is no Morphic and no file system.
+  `pass`, `outer`. Morphs show in the World tab (below); there is no file system.
 - **Compile errors** from your edit show in Slip's Transcript, and reach you as `error` events
   at `nendo://application/extension-events` ("Slip could not compile Foo>>bar: ..."). Read that
   after an edit and fix the record.
@@ -59,6 +59,23 @@ create many at once: one at a time, each for a reason you can name to the person
 Objects live only while Slip is open. `Slip keep: anObject as: 'name'` writes one to an
 `st.object` record as STON; `Slip kept: 'name'` reads a new copy; `Slip forget: 'name'` removes
 it; `Slip keptNames` lists them. Blocks and contexts cannot be kept.
+
+## Morphs and the World
+
+Slip's World tab shows morphs: `World open: aMorph` or `aMorph openInWorld`. Subclass `Morph` and
+override `drawOn: aCanvas` (`fillRect:color:`, `fillRoundRect:radius:color:`, `frameRect:color:width:`,
+`line:to:color:width:`, `drawString:at:size:bold:color:`, `clipTo:during:`), `extentChanged` to lay
+out submorphs, `worldResized:` to follow the World's size, and for events `handlesMouseDown:`,
+`mouseDown:`, `mouseUp:`, `wantsKeyboardFocus`, `keyStroke:` (the event's `key` is `'a'`,
+`'Enter'`, `'Backspace'`), `isDraggable`, `wantsDroppedMorph:`, `acceptDroppedMorph:event:`, and
+`wantsSteps` with `step`. Geometry is `Point` (`3 @ 4`) and `Rect` (`0 @ 0 extent: 100 @ 40`); the
+kernel's rectangle is `Rect`. Give a morph a theme colour by name (`color: #accent`; also `#text`,
+`#mutedText`, `#surface`, `#panel`, `#background`, `#line`) so it follows light and dark. Kernel
+morphs: `StringMorph`, `ButtonMorph label:action:`, `TextFieldMorph` (with `action:`).
+
+The Cards app (package `Cards`: `CardsBoard`, `CardsColumn`, `CardsCard`) is an example: read it
+in the file's `st.method` records before writing an app of your own. Its board is kept as the
+object `cards`.
 
 ## Nendo's records from Smalltalk
 

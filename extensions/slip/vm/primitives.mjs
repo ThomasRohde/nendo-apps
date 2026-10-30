@@ -434,6 +434,76 @@ export function installPrimitives(vm) {
   def('millis', () => Math.floor(performance.now()));
   def('random', () => new F(Math.random()));
 
+  // ---- The display ------------------------------------------------------------------
+  // A Canvas does not paint: each primitive adds one drawing operation to the Canvas's list,
+  // which the view paints once the drawing process has ended, so a frame never shows half
+  // drawn. vm.hooks.display is the view's display: open(world), size(), measure(text, size,
+  // bold) and dark(). Without one (a test, a file in), a World cannot open.
+  const n = x => (isInt(x) || x instanceof F) ? Number(num(x)) : NaN;
+  const finite = (...xs) => xs.every(Number.isFinite);
+  const point = p => {
+    if (!(p instanceof STObject) || p.cls !== C.Point) return null;
+    const xy = [n(p.f[0]), n(p.f[1])];
+    return finite(...xy) ? xy : null;
+  };
+  const rect = r => {
+    if (!(r instanceof STObject) || r.cls !== C.Rect) return null;
+    const a = point(r.f[0]), b = point(r.f[1]);
+    return a && b ? [a[0], a[1], b[0] - a[0], b[1] - a[1]] : null;
+  };
+  const color = c => {
+    if (!(c instanceof STObject) || c.cls !== C.Color) return null;
+    const [r, g, b, a] = c.f.map(n);
+    if (!finite(r, g, b, a)) return null;
+    const byte = v => Math.max(0, Math.min(255, Math.round(v)));
+    return `rgba(${byte(r)}, ${byte(g)}, ${byte(b)}, ${Math.max(0, Math.min(1, a))})`;
+  };
+  const width = w => (isInt(w) || w instanceof F) && n(w) >= 0 && n(w) <= 1000 ? n(w) : null;
+  const draw = fn => (r, args) => {
+    if (!(r instanceof STObject) || r.cls !== C.Canvas) return FAIL;
+    const op = fn(args);
+    if (!op) return FAIL;
+    (r.ops ??= []).push(op);
+    return r;
+  };
+  def('canvasFillRect', draw(([a, c]) => { const at = rect(a), css = color(c); return at && css && ['fill', ...at, css]; }));
+  def('canvasFrameRect', draw(([a, c, w]) => { const at = rect(a), css = color(c), line = width(w); return at && css && line !== null && ['frame', ...at, css, line]; }));
+  def('canvasRoundRect', draw(([a, radius, c]) => { const at = rect(a), css = color(c), r = width(radius); return at && css && r !== null && ['round', ...at, r, css]; }));
+  def('canvasOval', draw(([a, c]) => { const at = rect(a), css = color(c); return at && css && ['oval', ...at, css]; }));
+  def('canvasLine', draw(([from, to, c, w]) => { const a = point(from), b = point(to), css = color(c), line = width(w); return a && b && css && line !== null && ['line', ...a, ...b, css, line]; }));
+  def('canvasText', draw(([text, at, size, bold, c]) => {
+    const xy = point(at), css = color(c), px = width(size);
+    return isStr(text) && xy && css && px && typeof bold === 'boolean' && ['text', js(text), ...xy, px, bold, css];
+  }));
+  def('canvasPushClip', draw(([a]) => { const at = rect(a); return at && ['clip', ...at]; }));
+  def('canvasPopClip', draw(() => ['unclip']));
+  // The width a string takes on the display; without one, an estimate the tests can rely on.
+  def('textWidth', (r, [text, size, bold]) => {
+    const px = width(size);
+    if (!isStr(text) || !px || typeof bold !== 'boolean') return FAIL;
+    const measured = vm.hooks.display?.measure?.(js(text), px, bold);
+    return Math.ceil(Number.isFinite(measured) ? measured : js(text).length * px * (bold ? 0.62 : 0.56));
+  });
+  def('displayOpen', r => { if (!vm.hooks.display?.open) return FAIL; vm.hooks.display.open(r); return r; });
+  def('displaySize', () => {
+    const size = vm.hooks.display?.size?.();
+    if (!size) return FAIL;
+    const p = new STObject(C.Point, 2);
+    p.f = [Math.max(0, Math.round(size[0])), Math.max(0, Math.round(size[1]))];
+    return p;
+  });
+  def('displayDark', () => vm.hooks.display?.dark?.() === true);
+  // A colour of the display's theme, by name: [red, green, blue] from the view, or the
+  // method's own colour when there is no display.
+  def('themeColor', (r, [name]) => {
+    if (!vm.isSymbol(name)) return FAIL;
+    const rgb = vm.hooks.display?.color?.(name.s);
+    if (!Array.isArray(rgb) || rgb.length !== 3 || !rgb.every(v => Number.isInteger(v) && v >= 0 && v <= 255)) return FAIL;
+    const c = new STObject(C.Color, 4);
+    c.f = [...rgb, 1];
+    return c;
+  });
+
   return P;
 }
 
