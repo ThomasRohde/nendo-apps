@@ -115,8 +115,17 @@ async page => {
   const nudged = await frame.evaluate(id => Number(document.querySelector(`#paper .tr-component[data-id="${id}"] .tr-dot`).getAttribute('cx')), kettle.recordId);
   const kettleX = PAPER.left + Number(evolutionOf(kettle)) * plotW;
   assert(Math.abs(nudged - (kettleX + 0.01 * plotW)) < 0.05, `Shift+ArrowRight moved Kettle to x ${nudged}, not ${kettleX + 0.01 * plotW}.`);
-  const hollow = await frame.evaluate(id => document.querySelector(`#paper .tr-component[data-id="${id}"]`).classList.contains('tr-unconfirmed'), kettle.recordId);
-  assert(hollow, 'A moved component is not drawn as unconfirmed.');
+  // Hollow is measured as drawn: the moved dot is filled with the paper and has a dashed outline in
+  // another colour, where a confirmed dot on the same map has a solid one.
+  const dots = await frame.evaluate(id => {
+    const look = dot => { const s = getComputedStyle(dot); return { fill: s.fill, stroke: s.stroke, dash: s.strokeDasharray }; };
+    const moved = document.querySelector(`#paper .tr-component[data-id="${id}"] .tr-dot`);
+    const other = [...document.querySelectorAll('#paper .tr-component:not(.tr-unconfirmed) .tr-dot')][0];
+    const paper = getComputedStyle(document.querySelector("#paper svg rect.tr-paper")).fill;
+    return { moved: look(moved), other: other && look(other), paper };
+  }, kettle.recordId);
+  assert(dots.other && dots.moved.fill === dots.paper && dots.moved.stroke !== dots.other.stroke && dots.moved.dash !== 'none' && dots.other.dash === 'none',
+    `A moved component is not drawn hollow: ${JSON.stringify(dots)}`);
   checks.push('the keys move between components and nudge one by 0.01, drawn hollow');
   await command('discard');
   await until(() => window.terrain.waiting === 0, null, 'Discard left edits waiting.');
