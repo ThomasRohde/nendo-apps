@@ -115,16 +115,16 @@ async page => {
   const nudged = await frame.evaluate(id => Number(document.querySelector(`#paper .tr-component[data-id="${id}"] .tr-dot`).getAttribute('cx')), kettle.recordId);
   const kettleX = PAPER.left + Number(evolutionOf(kettle)) * plotW;
   assert(Math.abs(nudged - (kettleX + 0.01 * plotW)) < 0.05, `Shift+ArrowRight moved Kettle to x ${nudged}, not ${kettleX + 0.01 * plotW}.`);
-  // Hollow is measured as drawn: the moved dot is filled with the paper and has a dashed outline in
-  // another colour, where a confirmed dot on the same map has a solid one.
+  // Hollow is measured as drawn, from the dot's own attributes (focus paints a computed stroke over
+  // them): the moved dot is filled with the paper and has a dashed outline in another colour than a
+  // confirmed component's solid one. An anchor's hit circle (stroke none) is not a component's dot.
   const dots = await frame.evaluate(id => {
-    const look = dot => { const s = getComputedStyle(dot); return { fill: s.fill, stroke: s.stroke, dash: s.strokeDasharray }; };
+    const look = dot => dot && { fill: dot.getAttribute('fill'), stroke: dot.getAttribute('stroke'), dash: dot.getAttribute('stroke-dasharray') };
     const moved = document.querySelector(`#paper .tr-component[data-id="${id}"] .tr-dot`);
-    const other = [...document.querySelectorAll('#paper .tr-component:not(.tr-unconfirmed) .tr-dot')][0];
-    const paper = getComputedStyle(document.querySelector("#paper svg rect.tr-paper")).fill;
-    return { moved: look(moved), other: other && look(other), paper };
+    const other = [...document.querySelectorAll('#paper .tr-component:not(.tr-unconfirmed) .tr-dot')].find(dot => dot.getAttribute('stroke') !== 'none');
+    return { moved: look(moved), other: look(other), paper: document.querySelector('#paper .tr-paper').getAttribute('fill') };
   }, kettle.recordId);
-  assert(dots.other && dots.moved.fill === dots.paper && dots.moved.stroke !== dots.other.stroke && dots.moved.dash !== 'none' && dots.other.dash === 'none',
+  assert(dots.other && dots.moved.fill === dots.paper && dots.moved.stroke !== dots.other.stroke && dots.moved.dash && !dots.other.dash,
     `A moved component is not drawn hollow: ${JSON.stringify(dots)}`);
   checks.push('the keys move between components and nudge one by 0.01, drawn hollow');
   await command('discard');
