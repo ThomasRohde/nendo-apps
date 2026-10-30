@@ -102,6 +102,13 @@ export function installPrimitives(vm) {
   // An exception no handler took stops its process for the debugger. Proceed answers nil
   // from defaultAction, so signal answers nil.
   def('unhandled', (r, args, ctx) => { vm.ctx = ctx; vm.interrupt = { kind: 'unhandled', exception: r }; return SWITCHED; });
+  // A request to Nendo: the process waits for its answer, which becomes the value of the send.
+  def('nendoRequest', (r, [selector, args], ctx) => {
+    if (!vm.hooks.request || !vm.isSymbol(selector) || !(args instanceof STObject) || args.cls !== C.Array) return FAIL;
+    vm.ctx = ctx;
+    vm.interrupt = { kind: 'wait', promise: vm.hooks.request(selector.s, args.idx.slice()) };
+    return SWITCHED;
+  });
   const live = fn => (r, args, ctx) => r instanceof Context ? fn(r, args, ctx) : FAIL;
   def('ctxSender', live(r => r.sender ?? null));
   def('ctxReceiver', live(r => r.receiver));

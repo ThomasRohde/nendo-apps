@@ -4,7 +4,7 @@
 // folder. Accepts only with --accept, which the host serves at Unattended alone.
 import crypto from 'node:crypto';
 import { hostTool } from './host.mjs';
-import { TITLE, PLANNERS, PACKAGE_ID, buildMutations, upgradeMutations } from './slip/definition.mjs';
+import { TITLE, PLANNERS, PACKAGE_ID, SKILL_ID, buildMutations, upgradeMutations } from './slip/definition.mjs';
 const { createNendoMcpClient } = await hostTool('Nendo-McpClient.mjs');
 const EXAMPLES_TITLE = 'Slip: the example classes and the Start here page';
 const args = process.argv.slice(2), option = name => args[args.indexOf(name) + 1];
@@ -43,11 +43,13 @@ async function send(title, mutations) {
 
 // The examples need the record types, so they follow only once the app is in the file.
 if (upgrade) {
-  const held = (await read('nendo://application/extensions')).find(p => p.packageId === PACKAGE_ID);
+  const packages = await read('nendo://application/extensions');
+  const held = packages.find(p => p.packageId === PACKAGE_ID);
   if (!held) throw Error(`Refused: this file does not carry ${PACKAGE_ID}. Build it first.`);
-  const { mutations, changed, removed, version } = await upgradeMutations(held);
-  console.log(`Upgrade ${held.version} -> ${version}: ${changed.length} changed (${changed.join(', ') || 'none'}), ${removed.length} removed (${removed.join(', ') || 'none'}).`);
-  if (changed.length || removed.length || held.version !== version) await send(`Slip: the package at ${version}`, mutations);
+  const schema = { entities: (await read('nendo://application/describe?include=entities')).entities.map(e => ({ entityId: e.entityId, fields: (e.fields ?? []).map(f => ({ fieldId: f.fieldId })) })) };
+  const { mutations, changed, removed, types, version } = await upgradeMutations(held, { heldSkill: packages.find(p => p.packageId === SKILL_ID) ?? null, schema });
+  console.log(`Upgrade ${held.version} -> ${version}: ${types.length} record types added (${types.join(', ') || 'none'}), ${changed.length} changed (${changed.join(', ') || 'none'}), ${removed.length} removed (${removed.join(', ') || 'none'}).`);
+  if (types.length || changed.length || removed.length || held.version !== version) await send(`Slip: the package at ${version}`, mutations);
   else console.log('The file already carries this package. Nothing sent.');
 } else if (examplesOnly) await send(EXAMPLES_TITLE, data);
 else if (await send(TITLE, definition)) await send(EXAMPLES_TITLE, data);

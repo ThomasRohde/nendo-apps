@@ -127,6 +127,9 @@ const NAMES = {
     ['Warning', 'Exception', '', 'fixed'],
     ['Halt', 'Exception', '', 'fixed'],
     ['ExceptionSet', 'Object', 'exceptions', 'fixed'],
+    ['Nendo', 'Object', '', 'fixed'],
+    ['NendoRecord', 'Object', 'entityId recordId version values', 'fixed'],
+    ['Slip', 'Object', '', 'fixed'],
     ['SystemDictionary', 'Object', '', 'fixed'],
     ['Random', 'Object', '', 'fixed'],
     ['Time', 'Object', '', 'fixed'],
@@ -600,7 +603,10 @@ export class VM {
     }
   }
 
-  /** Stops a process for the debugger. kind: 'unhandled', 'interrupt', 'step' or 'debug'. */
+  /**
+   * Stops a process: for the debugger ('unhandled', 'interrupt', 'step' or 'debug'), or while it
+   * waits for Nendo ('wait', with the promise).
+   */
   suspend(proc, ctx, info) {
     proc.ctx = ctx;
     proc.suspended = info;
@@ -737,7 +743,8 @@ export class VM {
     const { kind, exception } = proc.suspended;
     const failure = kind === 'unhandled'
       ? new SmalltalkError(this.exceptionText(exception), { errorClass: this.classOf(exception).name })
-      : new SmalltalkError('Interrupted.', { interrupted: true });
+      : kind === 'wait' ? new SmalltalkError('Nendo answers only a run in the Workspace, which can wait for it.')
+        : new SmalltalkError('Interrupted.', { interrupted: true });
     failure.trace = this.stackOf(kind === 'unhandled' ? this.signallerContext(exception) ?? proc.ctx : proc.ctx);
     proc.done = true;
     proc.error = failure;

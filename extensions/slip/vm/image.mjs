@@ -7,7 +7,7 @@ import { VM, SmalltalkError, STClass } from './vm.mjs';
 export const KERNEL_FILES = [
   'Object.st', 'Boolean.st', 'Magnitude.st', 'Number.st', 'Character.st',
   'Collection.st', 'Sequenceable.st', 'OrderedCollection.st', 'String.st', 'Hashed.st',
-  'Stream.st', 'Block.st', 'Exception.st', 'Class.st', 'System.st',
+  'Stream.st', 'Block.st', 'Exception.st', 'Class.st', 'System.st', 'Nendo.st',
 ];
 
 /** Splits chunk-format text at single bangs; a doubled bang stands for one. */
@@ -176,6 +176,14 @@ export class Image {
     const promise = new Promise(resolve => {
       const step = () => {
         if (!proc.done && !proc.suspended) vm.run(proc, slice);
+        // A request to Nendo: its answer is the value of the send, its refusal an Error there.
+        if (proc.suspended?.kind === 'wait') {
+          const { promise: answer } = proc.suspended;
+          proc.waiting = true;
+          answer.then(value => { proc.ctx.stack.push(value ?? null); }, error => { proc.ctx = vm.trapContext(proc.ctx, error?.message ?? String(error)); })
+            .finally(() => { proc.suspended = null; proc.waiting = false; step(); });
+          return;
+        }
         if (proc.done || proc.suspended) resolve({ value: proc.value, error: proc.error, ms: performance.now() - started, suspended: proc.suspended ? proc : null });
         else yieldTo(step);
       };

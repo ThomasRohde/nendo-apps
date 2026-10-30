@@ -40,6 +40,21 @@ A Smalltalk environment in a Nendo file. `workspace/Slip.nendo` opens on it (`sl
   and ‹ to go back. Code in the inspector's box runs with `self` as the inspected object.
 - **Browse it** (Ctrl+Shift+B; Ctrl+B is Nendo's own key) opens the browser on the class named by the selection or the word at
   the caret.
+- **Keeping an object**: objects live until the view closes, unless kept on purpose.
+  `Slip keep: anObject as: 'name'` writes it to the file as STON; `Slip kept: 'name'` makes a new
+  copy, `Slip keptNames` lists them and `Slip forget: 'name'` removes one. Blocks cannot be kept.
+- **The file's other records**, from Smalltalk: `Nendo entities`, `Nendo records: 'entity.id'`
+  (NendoRecords, with `values` by field ID), `Nendo create:values:`, `Nendo update:values:` and
+  `Nendo delete:`. The run waits for each answer; the page does not.
+- **An agent** changes code by writing `st.class` and `st.method` records over Nendo's MCP server,
+  as the file's own skill (`slip-smalltalk`) teaches it; Slip compiles each change as it arrives,
+  and a compile error reaches the agent as one of the view's runtime events. To run Smalltalk, an
+  agent writes an `st.evaluation` record. It waits in a queue above the editor until you press
+  **Run** or **Decline**, unless you turned on the setting **Run an agent's evaluations** (off by
+  default, kept on each computer, also offered by the queue's own button). Slip writes the result,
+  or the error and its stack, and the Transcript output back into the record.
+- **Ask the agent**, in the debugger, sends your agent the stopped run's stack, with its methods
+  as the file's records. Nendo asks you first; the reply goes to the Transcript.
 
 ## How it works
 
@@ -53,25 +68,36 @@ A Smalltalk environment in a Nendo file. `workspace/Slip.nendo` opens on it (`sl
   `panes.mjs` draws them. A printString the inspector asks for is stopped after 200 ms, so a `printOn:` that
   never ends cannot hang the page.
 - `records.mjs` maps classes, methods and pages to three record types: `st.class`, `st.method`
-  and `st.snippet`. On start Slip compiles the file's classes and methods into the image; after
+  and `st.snippet`, and declares two more: `st.object` for kept objects and `st.evaluation` for an
+  agent's evaluations. On start Slip compiles the file's classes and methods into the image; after
   that every class defined and method compiled is written back, one write at a time. A change
   from outside (another client, an undo) is compiled when it arrives and named in a notice.
 - Exceptions are Smalltalk (`kernel/Exception.st`): `signal` walks the senders for an `on:do:`
   context, and a return that passes an `ensure:` context runs its block. The VM has a few
   context primitives for this, and stops a process for the debugger when `defaultAction` finds
   no handler. A debugger step runs the process until the next send it is watching for.
-- Objects are not kept: what a doit makes lives until the view closes. Code is the durable part.
+- `bridge.mjs` answers `Nendo request:with:`: the primitive stops the process with the request's
+  promise, and the image runs it on with the answer as the send's value, or signals an Error with
+  the refusal. It also writes and reads STON, a subset of Smalltalk Object Notation, for kept
+  objects. `agent.mjs` is the evaluation queue.
+- Objects are not kept unless kept on purpose: what a doit makes lives until the view closes.
+  Code is the durable part.
 - A file without the three record types still runs Slip, keeps nothing, and offers to ask Nendo
   for them as a proposal (`Slip: keep Smalltalk classes, methods and Workspace pages in this file`).
+  A file with them but not the two later ones keeps code, and offers those two
+  (`Slip: keep objects, and take an agent's evaluations, in this file`).
 
 ## Build and check
 
 - The lane is `pwsh ./tools/Test-Apps.ps1 -Lane Slip` (`tools/Review-Slip.ps1`): the node tests
-  in `tools/slip/` (kernel conformance, language, exceptions and debugger, records, package, browser and inspector), then `tools/Gate-Slip.mjs`
+  in `tools/slip/` (kernel conformance, language, exceptions and debugger, records, package, browser and inspector,
+  bridge and agent), then `tools/Gate-Slip.mjs`
   against the host's fixture broker.
 - `node tools/Build-Slip.mjs --endpoint http://127.0.0.1:PORT/mcp --accept` builds the app into
   an empty, host-created file at Unattended: the record types, the package and the view, then
-  the example classes (`tools/slip/examples.st`) and the Start here page. `--dry-run` sends
-  nothing.
+  the example classes (`tools/slip/examples.st`) and the Start here page. The skill package
+  `org.nendo.slip-smalltalk` (`tools/slip/skill/SKILL.md`) goes with the app. `--dry-run` sends
+  nothing. `--upgrade` brings a built file up to this folder: the record types it lacks, the
+  changed package files and the skill.
 
 Licence: MIT, in `LICENSE.txt`.

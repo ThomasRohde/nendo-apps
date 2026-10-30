@@ -24,6 +24,7 @@
     </nav>
     <main id="main">
       <div id="notices"></div>
+      <section id="agent-queue" class="agent-queue" aria-label="An agent's evaluations" hidden></section>
       <div id="own-toolbar" class="own-toolbar" hidden>
         <button type="button" data-command="doit">Do it</button>
         <button type="button" data-command="printit">Print it</button>
@@ -74,6 +75,7 @@
             <button id="d-into" type="button" title="Stop at the next message sent">Into</button>
             <button id="d-over" type="button" title="Stop at the chosen frame's next message">Over</button>
             <button id="d-abandon" type="button" class="quiet" title="End the run; its ensure: blocks run">Abandon</button>
+            <button id="d-ask" type="button" class="quiet" title="Send the stack and its methods to your agent" hidden>Ask the agent</button>
           </div>
         </header>
         <div class="d-body">
