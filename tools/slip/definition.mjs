@@ -120,6 +120,31 @@ export async function buildMutations() {
   return { definition: [...types, ...chunk(definition, 'Slip app')], data: chunk(data, 'Slip examples'), files, manifest };
 }
 
+/**
+ * The mutations that bring a built file's Slip package up to this folder: each changed file put
+ * over the content it replaces (so a newer package is never overwritten), each new file put as
+ * absent, each file the folder no longer has removed, and the version set. `held` is the file's
+ * listing of the package: {version, files: [{path, sha256}]}.
+ */
+export async function upgradeMutations(held) {
+  const { manifest, files } = await packageFiles();
+  const hashes = new Map((held?.files ?? []).map(f => [f.path, f.sha256]));
+  const operations = [op('extension.setPackage', { packageId: manifest.packageId, title: manifest.title, entryPoint: manifest.entryPoint ?? 'index.html', version: manifest.version, description: manifest.description })];
+  const changed = [];
+  for (const file of files) {
+    if (hashes.get(file.path) === file.sha256) continue;
+    changed.push(file.path);
+    for (let offset = 0; offset < Math.max(1, file.bytes.length); offset += 70 * 1024)
+      operations.push(op('extension.putFile', { packageId: manifest.packageId, path: file.path, base64: file.bytes.subarray(offset, offset + 70 * 1024).toString('base64'),
+        ...(offset === 0 ? { expectedSha256: hashes.get(file.path) ?? 'absent' } : { append: true }) }));
+  }
+  const removed = [...hashes].filter(([path]) => !files.some(f => f.path === path));
+  for (const [path, sha256] of removed) operations.push(op('extension.removeFile', { packageId: manifest.packageId, path, expectedSha256: sha256 }));
+  const mutations = [];
+  for (let at = 0; at < operations.length; at += 12) mutations.push({ description: `Slip package ${manifest.version} (${mutations.length + 1})`, operations: operations.slice(at, at + 12) });
+  return { mutations, changed, removed: removed.map(([path]) => path), version: manifest.version };
+}
+
 // ---- What the fixture broker serves the view in tools/Review-Slip.ps1.
 
 /** The file as the view reads it: Slip's record types and the example records. */
