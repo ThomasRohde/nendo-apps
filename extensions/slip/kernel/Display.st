@@ -4,7 +4,7 @@ Point comment: 'An x and a y, for a place on the display or a size. Make one wit
 Rect comment: 'A rectangle from its origin (top left) to its corner (bottom right), corner excluded. Make one with 0 @ 0 extent: 100 @ 40.'!
 Color comment: 'A colour: red, green and blue from 0 to 255, and alpha from 0 to 1. Color text, Color background and the others on the class side follow the display''s light or dark theme.'!
 Canvas comment: 'What a morph draws on. Each message adds one drawing operation; the display paints them all once the World has drawn, so a frame never shows half drawn.'!
-UIEvent comment: 'An event the display hands the World: #mouseDown, #mouseMove, #mouseUp, #keyDown, #step, #resize or #redraw, with a position and, for a key, its name (''a'', ''Enter'', ''Backspace'').'!
+UIEvent comment: 'An event the display hands the World: #mouseDown, #mouseMove, #mouseUp, #wheel, #keyDown, #step, #resize or #redraw, with a position; for a key, its name (''a'', ''Enter'', ''Backspace''); whether Shift and Ctrl were down; for a press, its click count (2 for a double click); for the wheel, how far it turned in pixels.'!
 
 !Point class methodsFor: 'instance creation'!
 x: xNumber y: yNumber
@@ -402,6 +402,9 @@ type: aSymbol position: aPoint
 !
 type: aSymbol position: aPoint button: anInteger key: aString shift: aBoolean
 	^self basicNew setType: aSymbol position: aPoint button: anInteger key: aString shift: aBoolean
+!
+type: aSymbol key: aString
+	^self type: aSymbol position: 0 @ 0 button: 0 key: aString shift: false
 ! !
 
 !UIEvent methodsFor: 'accessing'!
@@ -410,7 +413,15 @@ setType: aSymbol position: aPoint button: anInteger key: aString shift: aBoolean
 	position := aPoint.
 	button := anInteger.
 	key := aString.
-	shift := aBoolean
+	shift := aBoolean.
+	ctrl := false.
+	clicks := 1.
+	delta := 0
+!
+setCtrl: ctrlBoolean clicks: anInteger delta: aNumber
+	ctrl := ctrlBoolean.
+	clicks := anInteger.
+	delta := aNumber
 !
 type
 	^type
@@ -428,6 +439,18 @@ key
 shift
 	^shift
 !
+ctrl
+	"Whether Ctrl (or Command) was down."
+	^ctrl
+!
+clicks
+	"For #mouseDown, 1 for a click, 2 for a double click."
+	^clicks
+!
+delta
+	"For #wheel, how far the wheel turned, in pixels: positive is down."
+	^delta
+!
 keyCharacter
 	^(key notNil and: [key size = 1]) ifTrue: [key first] ifFalse: [nil]
 ! !
@@ -444,6 +467,12 @@ isMouseMove
 !
 isKeyDown
 	^type == #keyDown
+!
+isWheel
+	^type == #wheel
+!
+isDoubleClick
+	^type == #mouseDown and: [clicks >= 2]
 ! !
 
 !UIEvent methodsFor: 'printing'!

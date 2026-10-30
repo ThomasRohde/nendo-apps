@@ -28,7 +28,7 @@ classNamed: aString
 	^self at: aString asSymbol ifAbsent: [nil]
 !
 version
-	^'Slip 0.5'
+	^'Slip 0.6'
 ! !
 
 !SystemDictionary methodsFor: 'printing'!

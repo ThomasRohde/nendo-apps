@@ -805,7 +805,8 @@ $('tab-workspace').addEventListener('click', () => showTab('workspace'));
 $('tab-browser').addEventListener('click', () => showTab('browser'));
 $('tab-debugger').addEventListener('click', () => showTab('debugger'));
 $('tab-world').addEventListener('click', () => showTab('world'));
-$('w-cards').addEventListener('click', openCards);
+$('w-cards').addEventListener('click', () => openApp('Cards', 'CardsBoard'));
+$('w-sheets').addEventListener('click', () => openApp('Sheets', 'SheetsApp'));
 $('w-clear').addEventListener('click', () => worldDo('World removeAllMorphs'));
 $('own-toolbar').addEventListener('click', event => { const command = event.target.closest('button')?.dataset.command; if (command) run(command); });
 window.addEventListener('pagehide', () => { const page = currentPage(); if (page) { page.source = $('editor').value; savePage(page); } });
@@ -828,20 +829,20 @@ async function worldDo(source) {
   return outcome;
 }
 
-/** Open Cards: files the app in from the package when the file lacks it (so it is kept as records), then opens it. */
-async function openCards() {
+/** Opens one of the package's apps: files it in from apps/ when the file lacks it (so it is kept as records, and can be read in the Browser), then opens it. */
+async function openApp(name, className) {
   if (running) { say('Slip is still running. Press Ctrl+. to stop it.'); return; }
-  if (!classNamed('CardsBoard')) {
+  if (!classNamed(className)) {
     try {
-      const answer = await fetch(new URL('apps/Cards.st', import.meta.url));
-      if (!answer.ok) throw new Error(`apps/Cards.st did not load (${answer.status})`);
-      const result = image.fileIn(await answer.text(), 'Cards.st');
+      const answer = await fetch(new URL(`apps/${name}.st`, import.meta.url));
+      if (!answer.ok) throw new Error(`apps/${name}.st did not load (${answer.status})`);
+      const result = image.fileIn(await answer.text(), `${name}.st`);
       if (result.errors.length) throw new Error(result.errors[0]);
-      transcript(`Cards filed in: ${plural(result.methods, 'method')}${persisting ? ', kept in this file' : ''}.\n`);
+      transcript(`${name} filed in: ${plural(result.methods, 'method')} in package ${name}${persisting ? ', kept in this file' : ''}. Browse it in the Browser.\n`);
       browser.render();
-    } catch (error) { say(`Slip could not file in Cards: ${error.message}`, { problem: true }); return; }
+    } catch (error) { say(`Slip could not file in ${name}: ${error.message}`, { problem: true }); return; }
   }
-  await worldDo('CardsBoard open');
+  await worldDo(`${className} open`);
 }
 
 browser = createBrowser({ image: () => image, h, say, remember, recall, changed: () => renderTally() });

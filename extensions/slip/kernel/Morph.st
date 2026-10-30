@@ -178,6 +178,11 @@ wantsKeyboardFocus
 !
 keyStroke: anEvent
 !
+handlesWheel: anEvent
+	^false
+!
+wheel: anEvent
+!
 isDraggable
 	^false
 !
@@ -439,6 +444,7 @@ dispatch: anEvent
 	type == #redraw ifTrue: [^self changed].
 	type == #step ifTrue: [^self runSteps].
 	type == #keyDown ifTrue: [^focus ifNotNil: [:morph | morph keyStroke: anEvent]].
+	type == #wheel ifTrue: [^self wheelAt: anEvent].
 	grabbed ifNotNil: [:morph | ^self drag: morph event: anEvent].
 	type == #mouseDown ifTrue: [^self mouseDownAt: anEvent].
 	pressed ifNil: [^self].
@@ -457,6 +463,13 @@ mouseDownAt: anEvent
 	morph ifNil: [^self].
 	(morph handlesMouseDown: anEvent) ifTrue: [pressed := morph. ^morph mouseDown: anEvent].
 	^self grab: morph event: anEvent
+!
+wheelAt: anEvent
+	"The wheel goes to the nearest morph under the pointer that handles it."
+	| morph |
+	morph := self morphAt: anEvent position.
+	[morph notNil and: [(morph handlesWheel: anEvent) not]] whileTrue: [morph := morph owner].
+	morph ifNotNil: [morph wheel: anEvent]
 !
 grab: aMorph event: anEvent
 	grabOwner := aMorph owner.

@@ -67,7 +67,8 @@ override `drawOn: aCanvas` (`fillRect:color:`, `fillRoundRect:radius:color:`, `f
 `line:to:color:width:`, `drawString:at:size:bold:color:`, `clipTo:during:`), `extentChanged` to lay
 out submorphs, `worldResized:` to follow the World's size, and for events `handlesMouseDown:`,
 `mouseDown:`, `mouseUp:`, `wantsKeyboardFocus`, `keyStroke:` (the event's `key` is `'a'`,
-`'Enter'`, `'Backspace'`), `isDraggable`, `wantsDroppedMorph:`, `acceptDroppedMorph:event:`, and
+`'Enter'`, `'Backspace'`; `shift`, `ctrl`, `isDoubleClick`), `handlesWheel:` with `wheel:` (the
+event's `delta`), `isDraggable`, `wantsDroppedMorph:`, `acceptDroppedMorph:event:`, and
 `wantsSteps` with `step`. Geometry is `Point` (`3 @ 4`) and `Rect` (`0 @ 0 extent: 100 @ 40`); the
 kernel's rectangle is `Rect`. Give a morph a theme colour by name (`color: #accent`; also `#text`,
 `#mutedText`, `#surface`, `#panel`, `#background`, `#line`) so it follows light and dark. Kernel
@@ -75,7 +76,10 @@ morphs: `StringMorph`, `ButtonMorph label:action:`, `TextFieldMorph` (with `acti
 
 The Cards app (package `Cards`: `CardsBoard`, `CardsColumn`, `CardsCard`) is an example: read it
 in the file's `st.method` records before writing an app of your own. Its board is kept as the
-object `cards`.
+object `cards`. Sheets (package `Sheets`) is a larger one: a spreadsheet with a formula lexer and
+parser (`SheetLexer`, `SheetParser`, the `SheetNode` tree), functions (`SheetFunctions`, one
+`fnNAME:` method each), a `Sheet` that recalculates in dependency order and undoes, and the grid
+morph. Its sheet is kept as the object `sheet`. Add a function to Sheets by adding an `fn` method.
 
 ## Nendo's records from Smalltalk
 

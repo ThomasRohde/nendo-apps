@@ -6,6 +6,7 @@
 import { STObject } from './vm/vm.mjs';
 
 const STEP_MS = 250;
+const SLIP_KEYS = new Set(['d', 'p', 'i', '.', 's', 'b', 'r', 'l', 'w', 't', 'n', 'f']);
 // The theme colours a morph asks for by name (Color background, Color text ...): Nendo's tokens.
 const TOKENS = { background: '--canvas', panel: '--surface-soft', surface: '--surface-raised', text: '--ink', mutedText: '--muted', accent: '--cobalt', line: '--line-strong' };
 
@@ -16,10 +17,10 @@ export function point(vm, x, y) {
   return p;
 }
 
-/** A UIEvent for the VM: type is #mouseDown, #mouseMove, #mouseUp, #keyDown, #step, #resize or #redraw. */
-export function uiEvent(vm, type, x = 0, y = 0, { button = 0, key = null, shift = false } = {}) {
-  const event = new STObject(vm.classes.UIEvent, 5);
-  event.f = [vm.symbol(type), point(vm, x, y), button, key === null ? null : vm.str(key), shift];
+/** A UIEvent for the VM: type is #mouseDown, #mouseMove, #mouseUp, #wheel, #keyDown, #step, #resize or #redraw. */
+export function uiEvent(vm, type, x = 0, y = 0, { button = 0, key = null, shift = false, ctrl = false, clicks = 1, delta = 0 } = {}) {
+  const event = new STObject(vm.classes.UIEvent, 8);
+  event.f = [vm.symbol(type), point(vm, x, y), button, key === null ? null : vm.str(key), shift, ctrl, clicks, Math.round(delta)];
   return event;
 }
 
@@ -174,19 +175,31 @@ export function createDisplay(env) {
   setInterval(() => { if (world && !halted && !busy && !queue.length && env.visible()) post('step', 0, 0); }, STEP_MS);
 
   // ---- The canvas's events
+  let clicks = 0, last = { time: -1e9, x: 0, y: 0 };
   const at = event => { const box = canvas.getBoundingClientRect(); return [event.clientX - box.left, event.clientY - box.top]; };
   canvas.addEventListener('pointerdown', event => {
     canvas.focus();
     canvas.setPointerCapture?.(event.pointerId);
-    post('mouseDown', ...at(event), { button: event.button, shift: event.shiftKey });
+    // A pointer event carries no click count, so a second press near the first, soon, is a double click.
+    const [x, y] = at(event), now = performance.now();
+    clicks = now - last.time < 450 && Math.abs(x - last.x) < 5 && Math.abs(y - last.y) < 5 ? clicks + 1 : 1;
+    last = { time: now, x, y };
+    post('mouseDown', x, y, { button: event.button, shift: event.shiftKey, ctrl: event.ctrlKey || event.metaKey, clicks });
   });
+  canvas.addEventListener('wheel', event => {
+    event.preventDefault();
+    const lines = event.deltaMode === 1 ? event.deltaY * 20 : event.deltaMode === 2 ? event.deltaY * 400 : event.deltaY;
+    post('wheel', ...at(event), { shift: event.shiftKey, delta: lines });
+  }, { passive: false });
   canvas.addEventListener('pointermove', event => post('mouseMove', ...at(event), { button: event.button, shift: event.shiftKey }));
   canvas.addEventListener('pointerup', event => post('mouseUp', ...at(event), { button: event.button, shift: event.shiftKey }));
   canvas.addEventListener('keydown', event => {
-    if (event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.key === 'Tab' || event.key === 'Shift') return;
+    const ctrl = event.ctrlKey || event.metaKey;
+    // Slip's own keys (Do it, Print it, Stop ...) and the browser's stay theirs.
+    if (event.altKey || (ctrl && SLIP_KEYS.has(event.key.toLowerCase()))) return;
+    if (['Shift', 'Control', 'Meta', 'Alt'].includes(event.key) || (event.key === 'Tab' && event.shiftKey)) return;
     event.preventDefault();
-    post('keyDown', 0, 0, { key: event.key, shift: event.shiftKey });
+    post('keyDown', 0, 0, { key: event.key, shift: event.shiftKey, ctrl });
   });
   new ResizeObserver(() => refresh()).observe(canvas);
 
