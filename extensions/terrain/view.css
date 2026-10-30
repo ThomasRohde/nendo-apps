@@ -1,0 +1,85 @@
+/* Terrain: Nendo's tokens around the map, white paper under it. */
+:root {
+  color-scheme: light dark;
+  --gap: 12px;
+  --radius: 6px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--nendo-canvas, #f6f7f9);
+  color: var(--nendo-ink, #1f2328);
+  font: 13px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#app { flex: 1; min-height: 0; display: grid; grid-template-columns: auto 1fr 300px; }
+body.no-side #app { grid-template-columns: auto 1fr; }
+body.no-side .side { display: none; }
+
+.own-toolbar { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--nendo-line, #d0d7de); background: var(--nendo-surface, #fff); }
+button, select {
+  font: inherit; color: var(--nendo-ink, #1f2328); background: var(--nendo-surface, #fff);
+  border: 1px solid var(--nendo-line-strong, #8c959f); border-radius: var(--radius); padding: 3px 10px; cursor: pointer;
+}
+button[aria-pressed="true"] { background: var(--nendo-cobalt-soft, #dbe4ff); }
+button.primary { background: var(--nendo-cobalt, #3b5bdb); border-color: var(--nendo-cobalt, #3b5bdb); color: #fff; }
+button.danger { border-color: var(--nendo-danger, #c92a2a); color: var(--nendo-danger, #c92a2a); }
+button:disabled { opacity: .5; cursor: default; }
+
+.text-pane { width: 360px; display: flex; flex-direction: column; border-right: 1px solid var(--nendo-line, #d0d7de); background: var(--nendo-surface, #fff); min-height: 0; }
+.text-pane[hidden] { display: none; }
+.pane-head { display: flex; align-items: baseline; gap: 8px; padding: 8px 12px 4px; }
+.pane-head h2, .panel h2 { font-size: 13px; margin: 0; }
+.pane-head small, .hint { color: var(--nendo-muted, #57606a); }
+#text {
+  flex: 1; min-height: 0; margin: 0 12px; resize: none; padding: 8px;
+  font: 12px/1.5 Consolas, "Cascadia Mono", ui-monospace, monospace;
+  color: var(--nendo-ink, #1f2328); background: var(--nendo-surface-soft, #f6f8fa);
+  border: 1px solid var(--nendo-line, #d0d7de); border-radius: var(--radius); white-space: pre; tab-size: 2;
+}
+.text-errors { margin: 6px 12px 10px; padding-left: 18px; color: var(--nendo-danger, #c92a2a); max-height: 30%; overflow: auto; }
+.text-errors:empty { display: none; }
+
+.stage { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.paper-wrap { flex: 1; overflow: auto; padding: var(--gap); }
+.paper { width: max-content; margin: 0 auto; box-shadow: 0 1px 3px var(--nendo-shadow, rgba(0,0,0,.15)); border-radius: 2px; }
+.paper svg { display: block; user-select: none; touch-action: none; }
+.paper .tr-component { cursor: grab; outline: none; }
+.paper .tr-component:focus-visible .tr-dot { stroke: var(--nendo-cobalt, #3b5bdb); stroke-width: 3; }
+.paper .tr-handle { cursor: crosshair; }
+.paper.dragging .tr-component { cursor: grabbing; }
+.empty { margin: 48px auto; max-width: 420px; text-align: center; color: var(--nendo-muted, #57606a); }
+.rename { position: absolute; z-index: 3; font: inherit; padding: 2px 4px; width: 180px; border: 1px solid var(--nendo-cobalt, #3b5bdb); border-radius: 4px; }
+.held { margin: 8px var(--gap) 0; padding: 8px 12px; border-radius: var(--radius); background: var(--nendo-surface-raised, #fff); border: 1px solid var(--nendo-warning, #e67700); display: flex; gap: 12px; align-items: center; }
+.held p { margin: 0; flex: 1; }
+
+.side { border-left: 1px solid var(--nendo-line, #d0d7de); background: var(--nendo-surface, #fff); overflow: auto; }
+.panel { padding: 10px 12px; border-bottom: 1px solid var(--nendo-line, #d0d7de); }
+.panel[hidden] { display: none; }
+.field { display: grid; gap: 2px; margin: 8px 0; }
+.field label, .field .label { color: var(--nendo-muted, #57606a); font-size: 12px; }
+.field input, .field select, .field textarea {
+  font: inherit; color: var(--nendo-ink, #1f2328); background: var(--nendo-surface-soft, #f6f8fa);
+  border: 1px solid var(--nendo-line, #d0d7de); border-radius: 4px; padding: 3px 6px;
+}
+.maps-list { margin: 4px 0; padding-left: 18px; }
+.maps-list button { border: 0; padding: 0; background: none; color: var(--nendo-cobalt, #3b5bdb); text-decoration: underline; }
+.issues { margin: 6px 0; padding-left: 0; list-style: none; }
+.issues li { margin: 4px 0; }
+.issues button { width: 100%; text-align: left; border-color: var(--nendo-line, #d0d7de); }
+.issues .level { font-weight: 600; margin-right: 6px; }
+.issues .Error .level { color: var(--nendo-danger, #c92a2a); }
+.issues .Warning .level { color: var(--nendo-warning, #e67700); }
+
+dialog { border: 1px solid var(--nendo-line-strong, #8c959f); border-radius: 8px; background: var(--nendo-surface-raised, #fff); color: var(--nendo-ink, #1f2328); width: min(640px, 92vw); }
+dialog::backdrop { background: rgba(0,0,0,.35); }
+dialog h2 { font-size: 15px; margin: 0 0 8px; }
+dialog textarea { width: 100%; font: 12px/1.5 Consolas, ui-monospace, monospace; color: var(--nendo-ink, #1f2328); background: var(--nendo-surface-soft, #f6f8fa); border: 1px solid var(--nendo-line, #d0d7de); border-radius: 4px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+.summary { margin: 0; padding: 4px 12px; border-top: 1px solid var(--nendo-line, #d0d7de); background: var(--nendo-surface, #fff); color: var(--nendo-muted, #57606a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.summary.problem { color: var(--nendo-danger, #c92a2a); }
+body.native-chrome .own-toolbar { display: none; }

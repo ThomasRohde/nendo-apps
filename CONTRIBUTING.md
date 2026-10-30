@@ -13,6 +13,7 @@ This is for changing the apps. To use them, the [README](README.md) is all you n
 | Deck | [`extensions/deck`](extensions/deck/README.md) | `workspace/Deck.nendo` | `Review-Deck.ps1` |
 | Brandkits | `extensions/brandkits` | `workspace/Brandkits.nendo` | `Review-Brandkits.ps1` |
 | Garden | [`extensions/garden`](extensions/garden/README.md) | `workspace/Garden.nendo` | `Review-Garden.ps1` |
+| Terrain | [`extensions/terrain`](extensions/terrain/README.md) | `workspace/Terrain.nendo` | `Review-Terrain.ps1` |
 | Clay | [`extensions/clay`](extensions/clay/README.md) | `workspace/Clay.nendo` | none |
 | Slip | [`extensions/slip`](extensions/slip/README.md) | `workspace/Slip.nendo` (to come) | `Review-Slip.ps1` |
 

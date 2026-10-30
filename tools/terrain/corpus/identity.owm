@@ -1,0 +1,23 @@
+title Identity and access
+// Northstar, the platform team's map of sign-in for customers and staff.
+
+anchor Customer [0.95, 0.5]
+anchor Staff [0.95, 0.7]
+component Sign in [0.84, 0.6]
+component Identity [0.7, 0.62]
+component Customer directory [0.55, 0.45] (build) inertia
+component Staff directory [0.55, 0.82] (buy)
+component Single sign-on [0.4, 0.78] (buy)
+component Fraud signals [0.3, 0.2]
+component Compute [0.08, 0.92] (outsource)
+evolve Customer directory 0.72
+
+Customer->Sign in
+Staff->Sign in
+Sign in->Identity
+Identity->Customer directory
+Identity->Staff directory
+Identity->Single sign-on
+Identity->Fraud signals
+Customer directory->Compute
+Fraud signals->Compute

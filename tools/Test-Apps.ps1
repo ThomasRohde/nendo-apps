@@ -18,6 +18,7 @@ $lanes = [ordered]@{
     Deck             = 'Deck'
     Brandkits        = 'Brandkits'
     Garden           = 'Garden'
+    Terrain          = 'Terrain, Wardley maps'
     Slip             = 'Slip'
 }
 if ($Lane) {

@@ -1,0 +1,26 @@
+title Customer care
+// Northstar, the care team's map.
+
+anchor Customer [0.96, 0.5]
+component Answer a question [0.86, 0.45]
+component Chat assistant [0.74, 0.3]
+component Contact centre [0.7, 0.62] inertia
+component Knowledge base [0.55, 0.42]
+component Delivery tracking [0.5, 0.64]
+component Identity [0.32, 0.62]
+component Language model [0.22, 0.58] (buy)
+component Compute [0.08, 0.92] (outsource)
+evolve Chat assistant 0.5
+
+Customer->Answer a question
+Answer a question->Chat assistant
+Answer a question->Contact centre
+Chat assistant->Knowledge base
+Chat assistant->Delivery tracking
+Chat assistant->Language model
+Contact centre->Knowledge base
+Contact centre->Identity
+Delivery tracking->Identity
+Language model->Compute
+
+deaccelerator Data protection review [0.4, 0.2]
