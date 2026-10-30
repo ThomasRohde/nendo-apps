@@ -95,9 +95,14 @@ export async function exampleRecords() {
 /** Every operation of the build, in calls of at most 12, definition before data. */
 export async function buildMutations() {
   const { manifest, files } = await packageFiles();
+  // The host takes a required field only in the mutation that creates its record type, so each
+  // record type and its fields travel together, as one mutation.
+  const schema = [];
+  for (const operation of schemaOperations()) {
+    if (operation.operationType === 'schema.createEntity') schema.push([]);
+    schema.at(-1).push(operation);
+  }
   const definition = [
-    op('application.setPurpose', { purpose: PURPOSE }),
-    ...schemaOperations(),
     op('extension.setPackage', { packageId: manifest.packageId, title: manifest.title, entryPoint: manifest.entryPoint ?? 'index.html', version: manifest.version, description: manifest.description }),
   ];
   for (const file of files) for (let offset = 0; offset < Math.max(1, file.bytes.length); offset += 70 * 1024)
@@ -111,7 +116,8 @@ export async function buildMutations() {
     for (let at = 0; at < operations.length; at += 12) out.push({ description: `${description} (${out.length + 1})`, operations: operations.slice(at, at + 12) });
     return out;
   };
-  return { definition: chunk(definition, 'Slip app'), data: chunk(data, 'Slip examples'), files, manifest };
+  const types = schema.map((operations, i) => ({ description: `Slip record type ${operations[0].payload.entityId}`, operations: i === 0 ? [op('application.setPurpose', { purpose: PURPOSE }), ...operations] : operations }));
+  return { definition: [...types, ...chunk(definition, 'Slip app')], data: chunk(data, 'Slip examples'), files, manifest };
 }
 
 // ---- What the fixture broker serves the view in tools/Review-Slip.ps1.

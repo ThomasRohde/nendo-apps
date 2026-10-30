@@ -60,3 +60,14 @@ test('the build sends the package, the view and the examples in calls of at most
   assert.ok(operations.some(o => o.operationType === 'ui.addNode' && o.payload.properties.opensFile === true && o.payload.properties.packageId === PACKAGE_ID));
   assert.ok(operations.length <= 128 && data.flatMap(m => m.operations).length <= 128, 'Each change set carries at most 128 operations.');
 });
+
+test('a required field travels in the same mutation as the creation of its record type', async () => {
+  // The host refuses a required schema.addField for a record type an earlier mutation made (NPROP004).
+  const { definition } = await buildMutations();
+  for (const mutation of definition)
+    for (const operation of mutation.operations)
+      if (operation.operationType === 'schema.addField' && operation.payload.required)
+        assert.ok(mutation.operations.some(o => o.operationType === 'schema.createEntity' && o.payload.entityId === operation.payload.entityId),
+          `${operation.payload.fieldId} is required but is not in the mutation that creates ${operation.payload.entityId} ("${mutation.description}").`);
+  for (const mutation of definition) assert.ok(mutation.operations.length <= 16, `"${mutation.description}" holds ${mutation.operations.length} operations; a call carries 16.`);
+});
