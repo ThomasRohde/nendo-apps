@@ -44,17 +44,23 @@ async page => {
   assert(mapSelect && mapSelect.options.length === fixture.records['tr.map'].length, `The map list does not name the ${fixture.records['tr.map'].length} maps: ${JSON.stringify(mapSelect)}`);
   checks.push('Nendo accepts the toolbar, which lists every map');
 
-  // The paper fits the frame: with the text pane and the side panel open, in a narrow window, the
-  // map's right edge stays inside the frame until the person zooms.
+  // The map opens fitted to the frame: inside it on both sides, and as large as one side allows, in
+  // a narrow window and in a wide one, with the text pane and the side panel open.
   const window0 = page.viewportSize();
-  await page.setViewportSize({ width: 1100, height: window0?.height ?? 800 });
-  await settle();
-  const edges = await frame.evaluate(() => ({ text: !document.getElementById('text-pane').hidden,
-    wrap: document.getElementById('paper-wrap').getBoundingClientRect().right, svg: document.querySelector('#paper svg').getBoundingClientRect().right }));
-  assert(edges.text && edges.svg <= edges.wrap + 0.5, `In a 1100 px window the map's right edge is at ${edges.svg}, past the frame's ${edges.wrap}.`);
+  for (const width of [1100, 1900]) {
+    await page.setViewportSize({ width, height: window0?.height ?? 800 });
+    await settle();
+    const box = await frame.evaluate(() => {
+      const wrap = document.getElementById('paper-wrap'), svg = document.querySelector('#paper svg').getBoundingClientRect();
+      return { text: !document.getElementById('text-pane').hidden, room: [wrap.clientWidth - 24, wrap.clientHeight - 24], svg: [svg.width, svg.height] };
+    });
+    const inside = box.svg[0] <= box.room[0] + 1 && box.svg[1] <= box.room[1] + 1;
+    const filled = Math.abs(box.svg[0] - box.room[0]) <= 1.5 || Math.abs(box.svg[1] - box.room[1]) <= 1.5;
+    assert(box.text && inside && filled, `In a ${width} px window the map is ${box.svg.map(Math.round).join(' × ')} in a frame of ${box.room.join(' × ')}: not fitted.`);
+  }
   if (window0) await page.setViewportSize(window0);
   await settle();
-  checks.push('the map fits the frame with the text pane open');
+  checks.push('the map opens fitted to the frame, with the text pane open');
 
   // Geometry: on every map, each mark stands where its record says, measured from the SVG.
   const byId = list => new Map(list.map(r => [r.recordId, r]));

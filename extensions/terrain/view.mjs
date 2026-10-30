@@ -49,7 +49,7 @@ function readAll() {
     if (!state.mapId || !state.working.has(state.mapId)) state.mapId = M.maps(state.working)[0]?.recordId ?? null;
     if (state.selected && !state.working.has(state.selected)) state.selected = null;
     render({ text: true });
-    if (state.fitted) fitWidth();
+    if (state.fitted) fit();
   })();
   newestRead = reading;
   return reading;
@@ -681,17 +681,14 @@ function ownToolbar(items) {
 }
 
 function zoomTo(zoom, fitted = false) { state.fitted = fitted; state.zoom = Math.min(4, Math.max(0.25, zoom)); render(); }
+// The map opens fitted to the frame, as large as both its width and height allow, and stays
+// fitted as the frame changes until the person zooms. Fit brings that back.
 function fit() {
-  const box = $('paper-wrap').getBoundingClientRect();
-  zoomTo(Math.min((box.width - 24) / PAPER.width, (box.height - 24) / PAPER.height) || 1);
-}
-// Until the person zooms, the paper takes the frame's width, never more than its own size, so the
-// right edge of the map is never off the frame when the text pane or the side panel is open.
-function fitWidth() {
-  const width = $('paper-wrap').clientWidth - 24;
-  if (width <= 0) return;
-  const zoom = Math.min(1, width / PAPER.width);
-  if (Math.abs(zoom - state.zoom) > 0.001) zoomTo(zoom, true);
+  const wrap = $('paper-wrap');
+  const width = wrap.clientWidth - 24, height = wrap.clientHeight - 24;
+  if (width <= 0 || height <= 0) return;
+  const zoom = Math.min(width / PAPER.width, height / PAPER.height);
+  if (!state.fitted || Math.abs(zoom - state.zoom) > 0.001) zoomTo(zoom, true);
 }
 
 function find() {
@@ -708,7 +705,7 @@ function runCommand({ id, value }) {
     case 'map': if (value) openMap(value); break;
     case 'new-map': newMapGesture(); break;
     case 'import': openImport(); break;
-    case 'text': state.textOpen = value ?? !state.textOpen; $('text-pane').hidden = !state.textOpen; render({ text: true }); if (state.fitted) fitWidth(); break;
+    case 'text': state.textOpen = value ?? !state.textOpen; $('text-pane').hidden = !state.textOpen; render({ text: true }); if (state.fitted) fit(); break;
     case 'validate': state.validateOpen = value ?? !state.validateOpen; render(); break;
     case 'confirm': state.confirm = value ?? !state.confirm; render(); break;
     case 'undo': undo(); break;
@@ -790,7 +787,7 @@ function wire() {
   $('text').addEventListener('input', onTyped);
   $('text').addEventListener('blur', () => { if (!state.textErrors.length) printText(); });
   $('held-ok').addEventListener('click', () => { $('held').hidden = true; });
-  new ResizeObserver(() => { if (state.fitted) fitWidth(); }).observe($('paper-wrap'));
+  new ResizeObserver(() => { if (state.fitted) fit(); }).observe($('paper-wrap'));
 }
 
 // What the lane reads of the view's state, never what it writes.

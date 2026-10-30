@@ -74,8 +74,8 @@ The validator is off until the person turns it on, and each rule is a package se
 - **Nudge is Shift+Arrow.** The design says Alt+Arrow, but Alt+ArrowLeft and Alt+ArrowRight are
   Nendo's Back and Forward, and the host refuses them for a view. Shift+Arrow moves the selected
   component by 0.01; the plain arrows move between components.
-- **The paper takes the frame's width.** Until the person zooms, the map is fitted to the width of
-  the frame, never above its own size, so its right edge is never off the frame.
+- **The map opens fitted to the frame.** It is drawn as large as the frame's width and height
+  allow, and follows the frame as panes open and close, until the person zooms. Fit returns to it.
 
 ## Not yet checked
 
