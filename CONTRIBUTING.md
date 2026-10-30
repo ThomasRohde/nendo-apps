@@ -51,7 +51,19 @@ With Nendo running, the file open and agent access at **Shape app**:
 node ../nendo/tools/Put-NendoPackage.mjs extensions/gantt
 ```
 
-The person accepts the proposal in Nendo. See the host's
+The person accepts the proposal in Nendo.
+
+For a new app, the agent makes the file itself, at the level it needs, rather than asking the
+person to make an empty file and set its access:
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Nendo\Nendo.Desktop.exe" -new "workspace\Gantt.nendo" -access unattended
+node ../nendo/tools/Put-NendoPackage.mjs extensions/gantt --file Gantt.nendo --accept
+```
+
+`-access` takes `inspect`, `editData`, `shapeApp` or `unattended`, and works only beside `-new`
+on a file that launch makes. `--file` waits for that file to open. At `shapeApp`, leave out
+`--accept`: the proposal waits for the person. See the host's
 [Authoring a custom view](https://github.com/ThomasRohde/nendo/blob/main/docs/custom-view-authoring.md).
 
 ## Web pages and the web app site
