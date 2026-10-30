@@ -1,8 +1,8 @@
-// Slip's records: the shape of the file (three record types), the values one class, method or
+// Slip's records: the shape of the file (five record types), the values one class, method or
 // Workspace page is kept as, and the order a file's classes are defined in. No page and no
 // Nendo here: the view and the tests share it.
 
-export const E = { cls: 'st.class', method: 'st.method', page: 'st.snippet' };
+export const E = { cls: 'st.class', method: 'st.method', page: 'st.snippet', evaluation: 'st.evaluation', object: 'st.object' };
 
 export const F = {
   cls: {
@@ -15,10 +15,18 @@ export const F = {
     protocol: 'st.method.protocol', source: 'st.method.source',
   },
   page: { title: 'st.snippet.title', source: 'st.snippet.source' },
+  evaluation: { source: 'st.evaluation.source', state: 'st.evaluation.state', result: 'st.evaluation.result', output: 'st.evaluation.output' },
+  object: { name: 'st.object.name', className: 'st.object.className', ston: 'st.object.ston' },
 };
+
+/** Where an agent's evaluation is: it waits for Slip, ran, failed, or the person declined it. */
+export const STATE = { waiting: 'waiting', done: 'done', failed: 'failed', declined: 'declined' };
+// The record types code needs, and the two later ones: kept objects and an agent's evaluations.
+export const CORE = [E.cls, E.method, E.page];
 
 export const SIDE = { instance: 'instance', class: 'class' };
 export const SETUP_TITLE = 'Slip: keep Smalltalk classes, methods and Workspace pages in this file';
+export const MORE_TITLE = 'Slip: keep objects, and take an agent\'s evaluations, in this file';
 
 const text = (entityId, fieldId, displayName, required = false) =>
   ({ operationType: 'schema.addField', payload: { entityId, fieldId, displayName, storageKind: 'text', required, presentation: 'singleLine', options: [] } });
@@ -26,10 +34,10 @@ const long = (entityId, fieldId, displayName, required = false) =>
   ({ operationType: 'schema.addField', payload: { entityId, fieldId, displayName, storageKind: 'text', required, presentation: 'longText', options: [] } });
 
 /**
- * The operations that give a file Slip's three record types. `plain` leaves out the choice
- * colours, which a view's proposal on Nendo 1.0.0 cannot carry.
+ * The operations that give a file Slip's record types: all five, or those `only` names.
+ * `plain` leaves out the choice colours, which a view's proposal on Nendo 1.0.0 cannot carry.
  */
-export function schemaOperations({ plain = false } = {}) {
+export function schemaOperations({ plain = false, only = null } = {}) {
   const operations = [
     { operationType: 'schema.createEntity', payload: { entityId: E.cls, displayName: 'Smalltalk class' } },
     text(E.cls, F.cls.name, 'Name', true),
@@ -51,16 +59,33 @@ export function schemaOperations({ plain = false } = {}) {
     { operationType: 'schema.createEntity', payload: { entityId: E.page, displayName: 'Workspace page' } },
     text(E.page, F.page.title, 'Title', true),
     long(E.page, F.page.source, 'Source'),
+    { operationType: 'schema.createEntity', payload: { entityId: E.object, displayName: 'Kept Smalltalk object' } },
+    text(E.object, F.object.name, 'Name', true),
+    text(E.object, F.object.className, 'Class'),
+    long(E.object, F.object.ston, 'STON', true),
+    { operationType: 'schema.createEntity', payload: { entityId: E.evaluation, displayName: 'Smalltalk evaluation' } },
+    long(E.evaluation, F.evaluation.source, 'Source', true),
+    { operationType: 'schema.addField', payload: { entityId: E.evaluation, fieldId: F.evaluation.state, displayName: 'State', storageKind: 'text', required: false,
+      presentation: 'singleChoice', options: Object.values(STATE) } },
+    ...Object.entries({ waiting: 'amber', done: 'green', failed: 'red', declined: 'grey' }).map(([choiceId, tone]) =>
+      ({ operationType: 'schema.setChoiceMetadata', payload: { entityId: E.evaluation, fieldId: F.evaluation.state, choiceId, displayName: choiceId[0].toUpperCase() + choiceId.slice(1), retired: false, tone } })),
+    long(E.evaluation, F.evaluation.result, 'Result'),
+    long(E.evaluation, F.evaluation.output, 'Transcript output'),
   ];
-  return plain ? operations.filter(o => o.operationType !== 'schema.setChoiceMetadata') : operations;
+  const wanted = only ? operations.filter(o => only.includes(o.payload.entityId)) : operations;
+  return plain ? wanted.filter(o => o.operationType !== 'schema.setChoiceMetadata') : wanted;
 }
 
-/** True when the schema has every record type and field Slip keeps. */
-export function hasSchema(schema) {
+const FIELDS = { [E.cls]: F.cls, [E.method]: F.method, [E.page]: F.page, [E.object]: F.object, [E.evaluation]: F.evaluation };
+
+/** The record types Slip keeps that the schema lacks, or lacks a field of. */
+export function missingEntities(schema) {
   const entities = new Map((schema?.entities ?? []).map(e => [e.entityId, new Set(e.fields.map(f => f.fieldId))]));
-  const need = { [E.cls]: F.cls, [E.method]: F.method, [E.page]: F.page };
-  return Object.entries(need).every(([entityId, fields]) => entities.has(entityId) && Object.values(fields).every(f => entities.get(entityId).has(f)));
+  return Object.entries(FIELDS).filter(([entityId, fields]) => !entities.has(entityId) || !Object.values(fields).every(f => entities.get(entityId).has(f))).map(([entityId]) => entityId);
 }
+
+/** True when the schema has the record types code is kept in: classes, methods and pages. */
+export const hasSchema = schema => !missingEntities(schema).some(entityId => CORE.includes(entityId));
 
 const words = list => list.join(' ');
 

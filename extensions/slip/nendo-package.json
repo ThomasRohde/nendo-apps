@@ -1,7 +1,17 @@
 {
   "packageId": "org.nendo.slip",
   "title": "Slip",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "entryPoint": "index.html",
-  "description": "A Smalltalk environment in the file. Evaluate in a Workspace, browse and change classes, inspect objects, debug a run; the classes and methods you make are kept as records."
+  "description": "A Smalltalk environment in the file. Evaluate in a Workspace, browse and change classes, inspect objects, debug a run, keep objects, and let an agent change and run the code; the classes and methods you make are kept as records.",
+  "settings": [
+    {
+      "id": "agentEvaluations",
+      "title": "Run an agent's evaluations",
+      "help": "When on, Slip runs the Smalltalk an agent asks for in st.evaluation records as it comes, on this computer. When off, each waits in a queue until you press Run.",
+      "type": "toggle",
+      "default": false,
+      "layers": "personal"
+    }
+  ]
 }

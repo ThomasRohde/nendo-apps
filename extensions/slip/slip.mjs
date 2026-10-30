@@ -4,9 +4,11 @@
 // and said so. Objects are not kept: a doit's results live until the view closes.
 import { Image, KERNEL_FILES } from './vm/image.mjs';
 import { STClass } from './vm/vm.mjs';
-import { E, F, SIDE, SETUP_TITLE, schemaOperations, hasSchema, classValues, methodValues, methodKey, recordMethodKey, valuesDiffer,
+import { E, F, SIDE, SETUP_TITLE, MORE_TITLE, schemaOperations, hasSchema, missingEntities, classValues, methodValues, methodKey, recordMethodKey, valuesDiffer,
   definitionOrder, loadRecords, defineFromValues, compileFromValues } from './records.mjs';
-import { classNamed as classOfWord, KEYS, KEYS_SHIFTED, stoppedTitle } from './tools.mjs';
+import { createBridge } from './bridge.mjs';
+import { createAgentQueue, SETTING } from './agent.mjs';
+import { classNamed as classOfWord, KEYS, KEYS_SHIFTED, stoppedTitle, frameLabel } from './tools.mjs';
 import { createBrowser, createInspector, createDebugger } from './panes.mjs';
 
 const nendo = window.nendo ?? null;
@@ -45,6 +47,11 @@ let setupPending = null;      // { proposalId }
 let unsaved = { classes: new Set(), methods: new Map() }; // made before the file could keep them
 let outsideCount = 0;
 let armed = false;
+let missing = [];             // Slip's record types the file lacks, once it keeps code
+let objects = new Map();      // a kept object's name -> its st.object record
+let agentAllowed = false;     // the package setting: run an agent's evaluations as they come
+let agent = null;
+let capturing = null;         // the Transcript text an agent's evaluation writes
 // What the lane reads: whether Slip has started, and its image.
 window.slip = { ready: false, get image() { return image; }, get persisting() { return persisting; }, get running() { return Boolean(running); },
   get stopped() { return Boolean(stopped); }, get debugging() { return Boolean(debug?.process); } };
@@ -153,6 +160,7 @@ function flushUnsaved() {
 let transcriptText = '';
 let transcriptFrame = 0;
 function transcript(text) {
+  if (capturing !== null) capturing += text;
   transcriptText = (transcriptText + text).slice(-200000);
   if (transcriptFrame) return;
   transcriptFrame = requestAnimationFrame(() => {
@@ -174,6 +182,7 @@ async function boot() {
     transcript,
   });
   vm = image.vm;
+  vm.hooks.request = createBridge(vm, { nendo, objects, canKeep: () => persisting && !missing.includes(E.object) });
   const started = performance.now();
   const texts = await Promise.all(KERNEL_FILES.map(async name => {
     const answer = await fetch(new URL(`kernel/${name}`, import.meta.url));
@@ -196,6 +205,10 @@ async function connect() {
   nendo.on('theme', applyTheme);
   nendo.on('changes', pullSoon);
   if (nendo.has('ui.setToolbar')) nendo.on('command', command => run(command.id));
+  if (nendo.has('settings.all')) {
+    try { agentAllowed = (await nendo.settings.all())[SETTING] === true; } catch { agentAllowed = false; }
+    nendo.on('settingsChanged', values => { agentAllowed = values?.[SETTING] === true; renderAgent(); if (agentAllowed) agent.drain(); });
+  }
   return true;
 }
 
@@ -203,7 +216,9 @@ async function connect() {
 async function loadFile() {
   const schema = await nendo.schema.describe();
   if (!hasSchema(schema)) { persisting = false; return; }
+  missing = missingEntities(schema);
   const [classes, methods, pageRecords] = await Promise.all([E.cls, E.method, E.page].map(entityId => nendo.records.queryAll({ entityId }, { max: 20000 })));
+  await readLater();
   classRecords = new Map(classes.map(r => [r.values[F.cls.name], r]));
   methodRecords = new Map(methods.map(r => [recordMethodKey(r.values), r]));
   const loaded = loadRecords(image, classes, methods);
@@ -211,6 +226,16 @@ async function loadFile() {
   for (const problem of loaded.problems) transcript(`Not loaded: ${problem}\n`);
   takePages(pageRecords);
   persisting = !readOnly();
+}
+
+// The kept objects and an agent's evaluations, where the file has their record types.
+async function readLater() {
+  if (!missing.includes(E.object)) {
+    const kept = await nendo.records.queryAll({ entityId: E.object }, { max: 20000 });
+    objects.clear();
+    for (const r of kept) objects.set(String(r.values[F.object.name] ?? ''), r);
+  }
+  if (!missing.includes(E.evaluation)) agent.take(await nendo.records.queryAll({ entityId: E.evaluation }, { max: 2000 }));
 }
 
 function takePages(records) {
@@ -238,7 +263,13 @@ async function pull() {
       return;
     }
     await queue;
+    if (missing.length) {
+      const before = missing.length;
+      missing = missingEntities(await nendo.schema.describe());
+      if (missing.length < before) { setupPending = null; say('This file now keeps objects and takes an agent\'s evaluations.'); }
+    }
     const [classes, methods, pageRecords] = await Promise.all([E.cls, E.method, E.page].map(entityId => nendo.records.queryAll({ entityId }, { max: 20000 })));
+    await readLater();
     let came = 0;
     vm.quiet++;
     try {
@@ -262,7 +293,7 @@ async function pull() {
         const now = target?.methods.get(r.values[F.method.selector]);
         if (now && now.source === r.values[F.method.source] && (now.protocol ?? '') === (r.values[F.method.protocol] ?? '')) continue;
         try { compileFromValues(vm, r.values); came++; }
-        catch (error) { transcript(`Not loaded: ${key}: ${error.message}\n`); }
+        catch (error) { transcript(`Not loaded: ${key}: ${error.message}\n`); reportToAgent(`Slip could not compile ${key}: ${error.message}`); }
       }
       for (const [key, r] of [...methodRecords]) {
         if (seen.has(key) || busyWith(key)) continue;
@@ -286,17 +317,27 @@ async function pull() {
 
 // ---- Giving the file Slip's record types ---------------------------------------------
 
+// A compile error in code from outside reaches the agent that wrote it: Nendo reports an error
+// a view does not catch to nendo://application/extension-events (ADR-0032).
+function reportToAgent(text) {
+  try { globalThis.reportError?.(new Error(text)); } catch { /* nothing to report to */ }
+}
+
+const setupTitle = () => persisting ? MORE_TITLE : SETUP_TITLE;
+const setupOperations = plain => schemaOperations({ plain, only: persisting ? missing : null });
+
 async function proposeSetup() {
+  const SETUP_TITLE = setupTitle();
   if (setupPending) { say(`Accept "${SETUP_TITLE}" in Nendo's review.`); return; }
   if (!nendo.has('proposals.prepare')) { say('This version of Nendo cannot take a proposal from a view. Build the file with Slip\'s record types instead.', { problem: true }); return; }
   let answer;
-  try { answer = await nendo.proposals.prepare(SETUP_TITLE, schemaOperations()); }
+  try { answer = await nendo.proposals.prepare(SETUP_TITLE, setupOperations(false)); }
   catch (error) {
     if (!/expectedDefinitionRevision/.test(error.message ?? '')) {
       say(error.code === 'proposal-waiting' ? 'Another proposal from Slip is waiting in Nendo. Accept or reject it first.' : `Nendo did not take it: ${error.message}`, { problem: true });
       return;
     }
-    try { answer = await nendo.proposals.prepare(SETUP_TITLE, schemaOperations({ plain: true })); }
+    try { answer = await nendo.proposals.prepare(SETUP_TITLE, setupOperations(true)); }
     catch (again) { say(`Nendo did not take it: ${again.message}`, { problem: true }); return; }
   }
   if (answer.state === 'invalid') {
@@ -315,7 +356,12 @@ async function watchSetup() {
   try { state = (await nendo.proposals.get(setupPending.proposalId)).state; }
   catch { state = 'gone'; }
   if (state === 'previewable') { setTimeout(watchSetup, 1500); return; }
-  if (state !== 'active') { setupPending = null; say(`"${SETUP_TITLE}" was not accepted. Slip keeps your work on this page only.`); renderNotices(); return; }
+  if (state !== 'active') {
+    setupPending = null;
+    say(persisting ? `"${MORE_TITLE}" was not accepted.` : `"${SETUP_TITLE}" was not accepted. Slip keeps your work on this page only.`);
+    renderNotices();
+    return;
+  }
   pull();
 }
 
@@ -571,9 +617,69 @@ function showTab(name) {
   if (tab === 'browser') browser.render();
 }
 
+// ---- The agent -----------------------------------------------------------------------
+
+const idle = () => new Promise(resolve => { const check = () => running ? setTimeout(check, 100) : resolve(); check(); });
+
+/** Runs an agent's evaluation once nothing else runs; Stop reaches it as any run. */
+async function evaluateForAgent(source) {
+  await idle();
+  const first = source.trim().split('\n')[0].slice(0, 80);
+  transcript(`An agent's evaluation runs: ${first}\n`);
+  const outcome = await track(image.evaluate(source));
+  transcript(outcome.error || outcome.suspended ? 'It failed; the agent reads why in its record.\n' : 'It ran; the agent reads the result in its record.\n');
+  return outcome;
+}
+
+/** Ask the agent, from the debugger: the stack and the methods at fault, as the file's records. */
+async function askAgent({ title, frames, chosen }) {
+  const labels = frames.map(frame => frameLabel(vm, frame));
+  const context = [];
+  for (const frame of frames) {
+    const method = frame.method.methodClass ? frame.method : frame.method.method;
+    if (context.length >= 8 || !method?.methodClass) continue;
+    const owner = method.methodClass;
+    const key = methodKey(vm.instanceClass(owner).name, owner.isMeta ? SIDE.class : SIDE.instance, method.selector);
+    const record = methodRecords.get(key);
+    const uri = record && `nendo://application/entity/${encodeURIComponent(E.method)}/records?recordId=${encodeURIComponent(record.recordId)}`;
+    if (!record || context.some(item => item.uri === uri)) continue;
+    context.push({ uri, title: key.slice(0, 120), text: String(method.source ?? '').slice(0, 3800) });
+  }
+  const text = `Slip, the Smalltalk in this file, stopped a run: ${title}\n\nThe stack, innermost first:\n${labels.slice(0, 40).join('\n')}\n\n`
+    + `I am looking at ${labels[chosen] ?? 'the top frame'}. Find the cause. If a method is at fault, change its st.method record: Slip compiles a changed method as soon as it arrives. Say what you found and what you changed.`;
+  say('Asking the agent. Nendo may ask you first.');
+  try {
+    const answer = await nendo.assistant.ask(text.slice(0, 100000), { context });
+    transcript(`The agent answered:\n${answer?.reply ?? ''}\n`);
+    say('The agent answered. Its reply is in the Transcript.');
+  } catch (error) {
+    say(error.code === 'assistant-declined' ? 'The agent was not asked: you said Not now.' : `The agent was not asked: ${error.message}`, { problem: true });
+  }
+}
+
+function renderAgent() {
+  const box = $('agent-queue');
+  if (!box || !agent) return;
+  const list = agent.waiting;
+  box.hidden = list.length === 0;
+  if (!list.length) { box.replaceChildren(); return; }
+  const canSet = framed && nendo.has('settings.set');
+  box.replaceChildren(
+    h('p', {}, h('strong', {}, `An agent asks Slip to run ${plural(list.length, 'evaluation')}.`), ' ',
+      agentAllowed ? 'Slip runs them as they come, as Slip\'s settings say.' : 'Each runs only when you press Run. Read it first: it runs with everything this page can reach.'),
+    h('ol', {}, ...list.slice(0, 5).map(record => h('li', { 'data-record': record.recordId },
+      h('pre', {}, String(record.values[F.evaluation.source] ?? '').split('\n').slice(0, 8).join('\n')),
+      h('span', { class: 'actions' },
+        h('button', { type: 'button', 'data-act': 'run', disabled: Boolean(running), onclick: () => agent.run(record) }, 'Run'),
+        h('button', { type: 'button', 'data-act': 'decline', onclick: () => agent.decline(record) }, 'Decline'))))),
+    list.length > 5 ? h('p', {}, `And ${list.length - 5} more.`) : null,
+    canSet && !agentAllowed ? h('button', { type: 'button', 'data-act': 'allow', onclick: () => nendo.settings.set(SETTING, true).catch(error => say(error.message, { problem: true })) }, 'Run them as they come on this computer') : null);
+}
+
 // ---- Drawing -------------------------------------------------------------------------
 
 function render() {
+  renderAgent();
   renderPages();
   renderSaved();
   renderTally();
@@ -613,6 +719,11 @@ function renderNotices() {
       setupPending ? null : h('button', { type: 'button', onclick: proposeSetup }, 'Ask Nendo')));
   if (!framed)
     notices.push(h('div', { class: 'notice' }, h('p', {}, 'Slip runs outside Nendo here. Pages stay in this browser; classes and methods last until you close the page.')));
+  if (framed && persisting && !readOnly() && missing.length)
+    notices.push(h('div', { class: 'notice setup' },
+      h('p', {}, setupPending ? `Accept "${MORE_TITLE}" in Nendo's review.`
+        : 'Slip can also keep objects you keep with Slip keep:as:, and take evaluations an agent asks for. That needs two more record types in this file.'),
+      setupPending ? null : h('button', { type: 'button', onclick: proposeSetup }, 'Ask Nendo')));
   if (outsideCount)
     notices.push(h('div', { class: 'notice outside' },
       h('p', {}, `${plural(outsideCount, 'change')} to the code came in from outside Slip: another client or an undo changed the file. They are compiled and live now. The Transcript names them.`),
@@ -690,11 +801,16 @@ inspector = createInspector({ image: () => image, h, say,
   } });
 
 debug = createDebugger({ image: () => image, h, say, track, ended: debugEnded,
+  canAsk: () => framed && nendo.has('assistant.ask'), ask: askAgent,
   inspect: value => inspector.inspect(value),
   show: on => {
     $('tab-debugger').hidden = !on;
     if (!on && tab === 'debugger') showTab('workspace');
   } });
+
+agent = createAgentQueue({ nendo, image: () => image, say, changed: () => renderAgent(), allowed: () => agentAllowed,
+  evaluate: evaluateForAgent,
+  capture: on => { if (on) { capturing = ''; return ''; } const text = capturing ?? ''; capturing = null; return text; } });
 
 async function start() {
   try {

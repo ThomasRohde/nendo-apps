@@ -233,7 +233,8 @@ export function createInspector(env) {
 // ---- The debugger --------------------------------------------------------------------
 
 /**
- * env: { image(), h, say, inspect(value), show(on), track(promise), ended(outcome, how) }.
+ * env: { image(), h, say, inspect(value), show(on), track(promise), ended(outcome, how), canAsk(),
+ * ask({title, frames, chosen}) }.
  * The debugger holds one stopped process: its stack, the chosen frame's source with the send
  * it waits on marked, and its fields. Proceed, Into and Over run it on through track(), which
  * lets Stop reach it; a run that stops again comes back here, one that ends goes to ended().
@@ -278,6 +279,7 @@ export function createDebugger(env) {
       env.h('button', { type: 'button', 'data-label': row.label, title: `Inspect ${row.label}`, onclick: () => env.inspect(row.value) },
         env.h('span', { class: 'label' }, row.label), env.h('span', { class: 'value' }, printed(image, row.value))))));
     for (const id of ['d-proceed', 'd-restart', 'd-into', 'd-over', 'd-abandon']) $(id).disabled = false;
+    $('d-ask').hidden = !env.canAsk();
   }
 
   async function go(mode) {
@@ -314,6 +316,7 @@ export function createDebugger(env) {
   $('d-over').addEventListener('click', () => go('over'));
   $('d-restart').addEventListener('click', restart);
   $('d-abandon').addEventListener('click', abandon);
+  $('d-ask').addEventListener('click', () => { if (proc) env.ask({ title: stoppedTitle(env.image().vm, proc), frames, chosen }); });
 
   return { open, render, close, proceed: () => go('proceed'), abandon, get process() { return proc; }, get frame() { return frames[chosen] ?? null; } };
 }

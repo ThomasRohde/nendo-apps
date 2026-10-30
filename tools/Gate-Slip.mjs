@@ -10,7 +10,8 @@ async page => {
   await page.setViewportSize({ width: 1280, height: 860 });
   await page.goto('__BROKER_URL__');
   const fixture = '__SLIP_FIXTURE__';
-  await page.evaluate(fixture => { window.broker.offerWrites(true); window.broker.offerChrome(true); window.broker.setFixture(fixture); }, fixture);
+  await page.evaluate(fixture => { window.broker.offerWrites(true); window.broker.offerChrome(true); window.broker.setFixture(fixture);
+    window.broker.offerSettings({ agentEvaluations: false }); window.broker.offerAssistant({ state: 'ready', name: 'Agent', working: false, access: 'ask' }); }, fixture);
   const origin = await page.evaluate(() => window.broker.viewOrigin);
   let frame = null;
   for (let i = 0; i < 200 && !frame; i++) { frame = page.frames().find(f => f.url().startsWith(origin + '/')) ?? null; if (!frame) await page.waitForTimeout(50); }
@@ -240,16 +241,85 @@ async page => {
   assert((await frame.locator('#result').textContent()).includes('14'), 'Proceed shows the result.');
   passed('debug it');
 
+  // 18. Slip keep:as: keeps an object as STON in an st.object record, kept: reads it back, and
+  // Nendo records: reads the file's records; the run waits for each answer.
+  await write('Slip keep: (OrderedCollection with: 1 with: \'two\') as: \'pair\'. (Slip kept: \'pair\') size + (Nendo records: \'st.snippet\') size');
+  await command('printit');
+  await idle();
+  await frame.waitForFunction(() => /size \d+$/.test(document.getElementById('editor').value), null, { timeout: 5000 });
+  const keptPair = (await records('st.object')).find(r => r.values['st.object.name'] === 'pair');
+  assert(keptPair?.values['st.object.ston'] === 'OrderedCollection[1,\'two\']', `The pair must be kept as STON: ${JSON.stringify(keptPair?.values)}`);
+  const pageCount = (await records('st.snippet')).length;
+  assert((await editor().inputValue()).endsWith(` ${2 + pageCount}`), `kept: and records: must answer: ${await editor().inputValue()}`);
+  passed('keep and records');
+
+  // 19. An agent's evaluation waits, with the setting off, until the person presses Run, and
+  // Slip answers in its record. Run them as they come turns the setting on for this computer,
+  // and the next one runs by itself.
+  const ask = (recordId, source) => page.evaluate(([recordId, source]) => {
+    window.broker.put('st.evaluation', { entityId: 'st.evaluation', recordId, version: 1, labels: {}, exact: {}, calculated: {},
+      values: { 'st.evaluation.source': source, 'st.evaluation.state': 'waiting' } });
+    window.broker.pushChanges();
+  }, [recordId, source]);
+  const evaluation = async recordId => (await records('st.evaluation')).find(r => r.recordId === recordId);
+  await ask('st.evaluation.one', '3 * 5');
+  await frame.waitForFunction(() => !document.getElementById('agent-queue').hidden, null, { timeout: 5000 });
+  await page.waitForTimeout(400);
+  assert((await evaluation('st.evaluation.one')).values['st.evaluation.state'] === 'waiting', 'With the setting off, an evaluation must wait for the person.');
+  assert((await frame.locator('#agent-queue pre').textContent()) === '3 * 5', 'The queue shows the source before it runs.');
+  await frame.locator('#agent-queue button[data-act="run"]').click();
+  await page.waitForFunction(() => window.broker.records('st.evaluation').some(r => r.values['st.evaluation.state'] === 'done'), null, { timeout: 5000 });
+  assert((await evaluation('st.evaluation.one')).values['st.evaluation.result'] === '15', 'Slip answers with the result\'s printString.');
+  await frame.waitForFunction(() => document.getElementById('agent-queue').hidden, null, { timeout: 5000 });
+  await ask('st.evaluation.two', '6 * 7');
+  await frame.locator('#agent-queue button[data-act="allow"]').click();
+  await page.waitForFunction(() => window.broker.records('st.evaluation').find(r => r.recordId === 'st.evaluation.two')?.values['st.evaluation.state'] === 'done', null, { timeout: 5000 });
+  assert((await evaluation('st.evaluation.two')).values['st.evaluation.result'] === '42', 'With the setting on, it runs by itself.');
+  const settingsKept = await page.evaluate(() => window.broker.settingsKept);
+  assert(settingsKept.some(s => s.id === 'agentEvaluations' && s.value === true), 'The setting is kept for this computer.');
+  passed('agent evaluations');
+
+  // 20. Ask the agent sends the stopped run's stack, and its methods as the file's records.
+  await write('Stack new pop');
+  await command('doit');
+  await idle();
+  await frame.locator('#result button[data-act="debug"]').click();
+  await frame.waitForFunction(() => !document.getElementById('debugger-pane').hidden);
+  await frame.locator('#d-ask').click();
+  await page.waitForFunction(() => window.broker.assistantAsks.length === 1, null, { timeout: 5000 });
+  const asked = await page.evaluate(() => window.broker.assistantAsks[0]);
+  assert(JSON.stringify(asked).includes('The stack is empty.') && JSON.stringify(asked).includes('Stack>>pop'), `The message names the error and the stack: ${JSON.stringify(asked).slice(0, 300)}`);
+  assert(JSON.stringify(asked).includes('nendo://application/entity/st.method/records?recordId=st.method.stack-pop'), 'The context points at Stack>>pop\'s record.');
+  await page.evaluate(() => window.broker.answerAssistant({ reply: 'The stack was empty when pop was sent.', stopReason: 'endTurn' }));
+  await frame.waitForFunction(() => document.getElementById('transcript').textContent.includes('The stack was empty when pop was sent.'), null, { timeout: 5000 });
+  await frame.locator('#d-abandon').click();
+  await frame.waitForFunction(() => document.getElementById('debugger-pane').hidden);
+  passed('ask the agent');
+
+  // 21. A file Slip built before kept objects and evaluations: code is kept as before, and a
+  // notice offers the two later record types. This broker takes no proposals, so it says so.
+  const remountWith = async next => {
+    await page.evaluate(next => { window.broker.setFixture(next); window.broker.remount(); }, next);
+    frame = null;
+    for (let i = 0; i < 200; i++) {
+      await page.waitForTimeout(50);
+      frame = page.frames().find(f => f.url().startsWith(origin + '/')) ?? null;
+      if (frame && await frame.evaluate(() => window.slip?.ready === true).catch(() => false)) break;
+    }
+  };
+  const older = { ...fixture, schema: { ...fixture.schema, entities: fixture.schema.entities.filter(e => ['st.class', 'st.method', 'st.snippet'].includes(e.entityId)) } };
+  await remountWith(older);
+  assert(await frame.evaluate(() => window.slip.persisting) === true, 'A file with the first three record types keeps code.');
+  const offer = frame.locator('#notices .notice.setup');
+  assert(await offer.count() === 1 && (await offer.textContent()).includes('two more record types'), 'Slip must offer the two later record types.');
+  await offer.locator('button').click();
+  await frame.waitForFunction(() => document.getElementById('status').textContent.includes('cannot take a proposal'));
+  passed('later record types');
+
   // 10. A file without Slip's record types: Slip still runs, keeps nothing, and says how to
   // give the file the record types. This broker takes no proposals, so the button says so.
   const bare = { ...fixture, schema: { entities: [], commands: [] }, records: {} };
-  await page.evaluate(bare => { window.broker.setFixture(bare); window.broker.remount(); }, bare);
-  frame = null;
-  for (let i = 0; i < 200; i++) {
-    await page.waitForTimeout(50);
-    frame = page.frames().find(f => f.url().startsWith(origin + '/')) ?? null;
-    if (frame && await frame.evaluate(() => window.slip?.ready === true).catch(() => false)) break;
-  }
+  await remountWith(bare);
   assert(await frame.evaluate(() => window.slip.persisting) === false, 'A file without the record types cannot keep Slip\'s work.');
   assert(await frame.locator('#notices .notice.setup button').count() === 1, 'Slip must offer to ask Nendo for its record types.');
   await write('6 * 7');

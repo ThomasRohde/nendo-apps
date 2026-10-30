@@ -5,10 +5,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { bootImage } from './image.mjs';
-import { E, F, schemaOperations, classValues, methodValues, recordMethodKey } from '../../extensions/slip/records.mjs';
+import { E, F, schemaOperations, missingEntities, classValues, methodValues, recordMethodKey } from '../../extensions/slip/records.mjs';
 
 export const PACKAGE_FOLDER = path.resolve(import.meta.dirname, '../../extensions/slip');
 export const PACKAGE_ID = 'org.nendo.slip';
+// The file's own skill for an agent (ADR-0024): its name is the package ID's last segment.
+export const SKILL_ID = 'org.nendo.slip-smalltalk';
+export const SKILL_FILE = path.resolve(import.meta.dirname, 'skill/SKILL.md');
 export const VIEW_NODE = 'slip.home';
 export const TITLE = 'Slip: a Smalltalk environment, and the record types it keeps code in';
 export const PURPOSE = 'A Smalltalk environment. Evaluate code in a Workspace and print the results; classes and methods you make are kept in this file as records, and compiled again each time Slip opens.';
@@ -48,6 +51,31 @@ Greeter compile: 'greet
 `;
 
 const op = (operationType, payload) => ({ operationType, payload });
+const setPackage = manifest => op('extension.setPackage', { packageId: manifest.packageId, title: manifest.title, entryPoint: manifest.entryPoint ?? 'index.html',
+  version: manifest.version, description: manifest.description, ...(manifest.settings ? { settings: manifest.settings } : {}) });
+const setSkill = manifest => op('extension.setPackage', { packageId: SKILL_ID, kind: 'skill', title: 'Slip: Smalltalk in this file', version: manifest.version,
+  description: 'How an agent reads and changes the Smalltalk code in this file, and runs it in the person\'s open Slip.' });
+const putFile = (packageId, file, expectedSha256) => {
+  const out = [];
+  for (let offset = 0; offset < Math.max(1, file.bytes.length); offset += 70 * 1024)
+    out.push(op('extension.putFile', { packageId, path: file.path, base64: file.bytes.subarray(offset, offset + 70 * 1024).toString('base64'),
+      ...(offset === 0 ? { expectedSha256 } : { append: true }) }));
+  return out;
+};
+/** The skill's one file. */
+export async function skillFile() {
+  const bytes = await fs.readFile(SKILL_FILE);
+  return { path: 'SKILL.md', bytes, sha256: crypto.createHash('sha256').update(bytes).digest('hex') };
+}
+/** Slip's record types, each with its fields as one mutation: the host takes a required field only there. */
+function typeMutations(only = null) {
+  const groups = [];
+  for (const operation of schemaOperations({ only })) {
+    if (operation.operationType === 'schema.createEntity') groups.push([]);
+    groups.at(-1).push(operation);
+  }
+  return groups.map(operations => ({ description: `Slip record type ${operations[0].payload.entityId}`, operations }));
+}
 // A record ID from a name or a method key; a binary selector's characters are spelled out, so
 // Shape>>< and Shape>><= get different IDs.
 const slug = text => text.replace(/[^A-Za-z0-9 :]/g, c => ` x${c.charCodeAt(0).toString(16)}`).trim().replace(/[ :]+/g, '-').replace(/-$/, '').toLowerCase();
@@ -95,19 +123,9 @@ export async function exampleRecords() {
 /** Every operation of the build, in calls of at most 12, definition before data. */
 export async function buildMutations() {
   const { manifest, files } = await packageFiles();
-  // The host takes a required field only in the mutation that creates its record type, so each
-  // record type and its fields travel together, as one mutation.
-  const schema = [];
-  for (const operation of schemaOperations()) {
-    if (operation.operationType === 'schema.createEntity') schema.push([]);
-    schema.at(-1).push(operation);
-  }
-  const definition = [
-    op('extension.setPackage', { packageId: manifest.packageId, title: manifest.title, entryPoint: manifest.entryPoint ?? 'index.html', version: manifest.version, description: manifest.description }),
-  ];
-  for (const file of files) for (let offset = 0; offset < Math.max(1, file.bytes.length); offset += 70 * 1024)
-    definition.push(op('extension.putFile', { packageId: manifest.packageId, path: file.path,
-      base64: file.bytes.subarray(offset, offset + 70 * 1024).toString('base64'), ...(offset === 0 ? { expectedSha256: 'absent' } : { append: true }) }));
+  const definition = [setPackage(manifest)];
+  for (const file of files) definition.push(...putFile(manifest.packageId, file, 'absent'));
+  definition.push(setSkill(manifest), ...putFile(SKILL_ID, await skillFile(), 'absent'));
   definition.push(op('ui.addNode', { surfaceId: 'slip', nodeId: VIEW_NODE, parentNodeId: null, kind: 'extensionView', position: 0,
     properties: { definitionVersion: 3, title: 'Slip', packageId: manifest.packageId, opensFile: true } }));
   const data = (await exampleRecords()).records.map(r => op('data.createRecord', { entityId: r.entityId, recordId: r.recordId, values: r.values }));
@@ -116,33 +134,40 @@ export async function buildMutations() {
     for (let at = 0; at < operations.length; at += 12) out.push({ description: `${description} (${out.length + 1})`, operations: operations.slice(at, at + 12) });
     return out;
   };
-  const types = schema.map((operations, i) => ({ description: `Slip record type ${operations[0].payload.entityId}`, operations: i === 0 ? [op('application.setPurpose', { purpose: PURPOSE }), ...operations] : operations }));
+  const types = typeMutations().map((mutation, i) => i === 0 ? { ...mutation, operations: [op('application.setPurpose', { purpose: PURPOSE }), ...mutation.operations] } : mutation);
   return { definition: [...types, ...chunk(definition, 'Slip app')], data: chunk(data, 'Slip examples'), files, manifest };
 }
 
 /**
- * The mutations that bring a built file's Slip package up to this folder: each changed file put
- * over the content it replaces (so a newer package is never overwritten), each new file put as
- * absent, each file the folder no longer has removed, and the version set. `held` is the file's
- * listing of the package: {version, files: [{path, sha256}]}.
+ * The mutations that bring a built file up to this folder: the record types it lacks, then each
+ * changed package file put over the content it replaces (so a newer package is never
+ * overwritten), each new file put as absent, each file the folder no longer has removed, the
+ * version and settings set, and the skill put or brought up to date. `held` is the file's
+ * listing of the package: {version, files: [{path, sha256}]}; `heldSkill` the skill's, or null;
+ * `schema` the file's schema.
  */
-export async function upgradeMutations(held) {
+export async function upgradeMutations(held, { heldSkill = null, schema = null } = {}) {
   const { manifest, files } = await packageFiles();
   const hashes = new Map((held?.files ?? []).map(f => [f.path, f.sha256]));
-  const operations = [op('extension.setPackage', { packageId: manifest.packageId, title: manifest.title, entryPoint: manifest.entryPoint ?? 'index.html', version: manifest.version, description: manifest.description })];
+  const operations = [setPackage(manifest)];
   const changed = [];
   for (const file of files) {
     if (hashes.get(file.path) === file.sha256) continue;
     changed.push(file.path);
-    for (let offset = 0; offset < Math.max(1, file.bytes.length); offset += 70 * 1024)
-      operations.push(op('extension.putFile', { packageId: manifest.packageId, path: file.path, base64: file.bytes.subarray(offset, offset + 70 * 1024).toString('base64'),
-        ...(offset === 0 ? { expectedSha256: hashes.get(file.path) ?? 'absent' } : { append: true }) }));
+    operations.push(...putFile(manifest.packageId, file, hashes.get(file.path) ?? 'absent'));
   }
   const removed = [...hashes].filter(([path]) => !files.some(f => f.path === path));
   for (const [path, sha256] of removed) operations.push(op('extension.removeFile', { packageId: manifest.packageId, path, expectedSha256: sha256 }));
-  const mutations = [];
+  const skill = await skillFile();
+  const heldSkillHash = heldSkill?.files?.find(f => f.path === skill.path)?.sha256 ?? null;
+  if (heldSkillHash !== skill.sha256) {
+    changed.push(`${SKILL_ID}/${skill.path}`);
+    operations.push(setSkill(manifest), ...putFile(SKILL_ID, skill, heldSkillHash ?? 'absent'));
+  }
+  const types = schema ? missingEntities(schema) : [];
+  const mutations = types.length ? typeMutations(types) : [];
   for (let at = 0; at < operations.length; at += 12) mutations.push({ description: `Slip package ${manifest.version} (${mutations.length + 1})`, operations: operations.slice(at, at + 12) });
-  return { mutations, changed, removed: removed.map(([path]) => path), version: manifest.version };
+  return { mutations, changed, removed: removed.map(([path]) => path), types, version: manifest.version };
 }
 
 // ---- What the fixture broker serves the view in tools/Review-Slip.ps1.
