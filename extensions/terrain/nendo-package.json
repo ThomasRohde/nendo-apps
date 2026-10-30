@@ -1,0 +1,67 @@
+{
+  "packageId": "org.nendo.terrain",
+  "title": "Terrain",
+  "version": "0.1.0",
+  "entryPoint": "index.html",
+  "description": "Wardley maps as views of one shared landscape: a component is one record on every map, and dated assessments set where it stands. Draw and drag on SVG paper with draft and commit, write the map as OnlineWardleyMaps text both ways, check it with a validator, and export SVG, PNG and text.",
+  "settings": [
+    {
+      "id": "check.cycle",
+      "title": "Dependency cycles",
+      "help": "An error the validator reports. The file can turn a check on or off for everyone who opens it; your own choice wins on this computer.",
+      "type": "toggle",
+      "default": true,
+      "layers": "both"
+    },
+    {
+      "id": "check.range",
+      "title": "Positions out of range",
+      "help": "An error the validator reports. The file can turn a check on or off for everyone who opens it; your own choice wins on this computer.",
+      "type": "toggle",
+      "default": true,
+      "layers": "both"
+    },
+    {
+      "id": "check.upward",
+      "title": "Links that run upward",
+      "help": "A warning the validator reports. The file can turn a check on or off for everyone who opens it; your own choice wins on this computer.",
+      "type": "toggle",
+      "default": true,
+      "layers": "both"
+    },
+    {
+      "id": "check.orphan",
+      "title": "Orphans",
+      "help": "A warning the validator reports. The file can turn a check on or off for everyone who opens it; your own choice wins on this computer.",
+      "type": "toggle",
+      "default": true,
+      "layers": "both"
+    },
+    {
+      "id": "check.no-user",
+      "title": "Maps without a user",
+      "help": "A warning the validator reports. The file can turn a check on or off for everyone who opens it; your own choice wins on this computer.",
+      "type": "toggle",
+      "default": true,
+      "layers": "both"
+    },
+    {
+      "id": "paper",
+      "title": "Paper",
+      "help": "White paper in both themes, as a printed map, or the theme's own colours.",
+      "type": "choice",
+      "options": [
+        {
+          "value": "white",
+          "label": "White"
+        },
+        {
+          "value": "theme",
+          "label": "The theme's colours"
+        }
+      ],
+      "default": "white",
+      "layers": "personal"
+    }
+  ]
+}

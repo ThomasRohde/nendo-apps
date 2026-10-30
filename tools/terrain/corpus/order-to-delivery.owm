@@ -1,0 +1,29 @@
+title Order to delivery
+// Northstar, the delivery team's map for business customers.
+
+anchor Business customer [0.96, 0.55]
+component Place an order [0.86, 0.48]
+component Delivery tracking [0.72, 0.64] (build)
+component Order management [0.66, 0.52] inertia
+component Route optimisation [0.5, 0.31] (build)
+component Warehouse system [0.42, 0.68] (buy)
+component Identity [0.38, 0.62]
+component Maps and traffic data [0.24, 0.86] (buy) (market)
+component Compute [0.08, 0.92] (outsource)
+evolve Route optimisation 0.55
+pipeline Delivery tracking [0.45, 0.8]
+
+Business customer->Place an order
+Business customer->Delivery tracking
+Place an order->Order management
+Delivery tracking->Order management
+Order management->Warehouse system
+Order management->Identity
+Delivery tracking->Route optimisation
+Route optimisation->Maps and traffic data
+Place an order+'order'>Warehouse system
+Route optimisation->Compute
+Warehouse system->Compute
+
+note Built in 2019, before parcel APIs were common [0.6, 0.18]
+accelerator Open parcel APIs [0.78, 0.86]

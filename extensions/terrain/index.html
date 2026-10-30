@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Terrain</title>
+  <link rel="stylesheet" href="view.css">
+</head>
+<body>
+  <div id="own-toolbar" class="own-toolbar" role="toolbar" aria-label="Terrain" hidden></div>
+  <div id="app" aria-busy="true">
+    <section id="text-pane" class="text-pane" aria-label="The map as OnlineWardleyMaps text" hidden>
+      <header class="pane-head"><h2>Text</h2><small>OnlineWardleyMaps</small></header>
+      <textarea id="text" spellcheck="false" autocomplete="off" aria-describedby="text-errors" aria-label="The map as OnlineWardleyMaps text"></textarea>
+      <ol id="text-errors" class="text-errors" aria-live="polite"></ol>
+    </section>
+
+    <main id="stage" class="stage" aria-label="Map">
+      <div id="held" class="held" role="alert" hidden><p id="held-text"></p><button type="button" id="held-ok">OK</button></div>
+      <div id="paper-wrap" class="paper-wrap">
+        <div id="paper" class="paper"></div>
+      </div>
+      <p id="empty" class="empty" hidden>This file has no map yet. Choose <strong>New map</strong>, or <strong>Import…</strong> to paste OnlineWardleyMaps text.</p>
+      <input id="rename" class="rename" aria-label="Name" hidden>
+    </main>
+
+    <aside id="side" class="side" aria-label="Inspector">
+      <section id="inspector" class="panel" aria-labelledby="inspector-title">
+        <h2 id="inspector-title">Map</h2>
+        <div id="inspector-body"></div>
+      </section>
+      <section id="validator" class="panel" aria-labelledby="validator-title" hidden>
+        <h2 id="validator-title">Validator</h2>
+        <p id="validator-none" class="hint" hidden>Nothing to fix on this map.</p>
+        <ol id="issues" class="issues"></ol>
+      </section>
+    </aside>
+  </div>
+
+  <dialog id="import" aria-labelledby="import-title">
+    <form method="dialog" id="import-form">
+      <h2 id="import-title">Import a map</h2>
+      <p class="hint">Paste OnlineWardleyMaps text. It becomes a new map; no other map moves. A name the landscape knows places that component.</p>
+      <textarea id="import-text" rows="14" spellcheck="false" aria-label="OnlineWardleyMaps text"></textarea>
+      <ol id="import-errors" class="text-errors" aria-live="polite"></ol>
+      <div class="actions"><button value="cancel" type="submit">Cancel</button><button value="import" type="submit" class="primary">Import</button></div>
+    </form>
+  </dialog>
+  <dialog id="confirm-delete" aria-labelledby="confirm-delete-title">
+    <form method="dialog">
+      <h2 id="confirm-delete-title">Delete from the landscape?</h2>
+      <p id="confirm-delete-text"></p>
+      <div class="actions"><button value="cancel" type="submit">Cancel</button><button value="delete" type="submit" class="danger">Delete</button></div>
+    </form>
+  </dialog>
+
+  <p id="summary" class="summary" role="status" aria-live="polite">Reading the file…</p>
+  <script src="/_nendo/api.js"></script>
+  <script type="module" src="view.mjs"></script>
+</body>
+</html>
