@@ -117,3 +117,20 @@ test('an upgrade adds the record types a file lacks, the skill, and only the cha
     { heldSkill: { files: [{ path: 'SKILL.md', sha256: (await skillFile()).sha256 }] }, schema: describe(schemaOperations()) });
   assert.deepEqual([again.changed, again.removed, again.types], [[], [], []], 'An up-to-date file needs nothing.');
 });
+
+test('every add_operations call the build or an upgrade sends fits the host\'s request body', async () => {
+  // The host refuses a request over limits.requestBodyBytes with NENDO_REQUEST_TOO_LARGE. The
+  // request is measured as Nendo-McpClient sends it, with handles and keys at their full length.
+  const REQUEST_BODY_BYTES = 262_144;
+  const request = mutation => JSON.stringify({ jsonrpc: '2.0', id: 999, method: 'tools/call', params: { name: 'nendo.change_set.add_operations',
+    arguments: { applicationHandle: 'h'.repeat(64), leaseId: 'l'.repeat(64), changeSetId: `changeset-${'c'.repeat(32)}`, mutations: [mutation], idempotencyKey: crypto.randomUUID() },
+    _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {}, 'io.modelcontextprotocol/clientInfo': { name: 'nendo-slip-builder', version: '1.0' } } } });
+  const { definition, data } = await buildMutations();
+  // A file that holds none of the package's files is the largest upgrade there is: every file is put.
+  const everything = await upgradeMutations({ version: '0.0.0', files: [] }, { schema: { entities: [] } });
+  for (const mutation of [...definition, ...data, ...everything.mutations]) {
+    const bytes = Buffer.byteLength(request(mutation));
+    assert.ok(bytes <= REQUEST_BODY_BYTES, `${mutation.description} is a ${bytes}-byte request; the host reads at most ${REQUEST_BODY_BYTES}.`);
+    assert.ok(mutation.operations.length <= 12, `${mutation.description} carries ${mutation.operations.length} operations.`);
+  }
+});
