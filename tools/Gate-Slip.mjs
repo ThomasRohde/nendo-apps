@@ -32,7 +32,7 @@ async page => {
   const refusals = await page.evaluate(() => window.broker.chromeRefusals);
   assert(refusals.length === 0, 'Nendo refused Slip\'s toolbar: ' + JSON.stringify(refusals));
   const toolbars = await page.evaluate(() => window.broker.toolbars);
-  assert(toolbars.length > 0 && toolbars.at(-1).items.map(i => i.id).join(',') === 'doit,printit,inspectit,browseit,stop', 'The toolbar must offer Do it, Print it, Inspect it, Browse it and Stop.');
+  assert(toolbars.length > 0 && toolbars.at(-1).items.map(i => i.id).join(',') === 'doit,printit,inspectit,browseit,debugit,stop', 'The toolbar must offer Do it, Print it, Inspect it, Browse it, Debug it and Stop.');
   assert(await frame.evaluate(() => getComputedStyle(document.getElementById('own-toolbar')).display === 'none'), 'With Nendo\'s toolbar offered, Slip draws no toolbar of its own.');
   assert(await frame.locator('#notices .notice').count() === 0, 'A file that is ready shows no notice.');
   passed('mount');
@@ -206,6 +206,39 @@ async page => {
   assert(await frame.locator('#inspector').isHidden(), 'Close hides the inspector.');
   await frame.locator('#tab-workspace').click();
   passed('browse it');
+
+  // 16. An error leaves a notifier; Debug opens the debugger on the method that raised it,
+  // with the send it waits on marked, and Proceed runs on to the end.
+  const marked = () => frame.locator('#d-source mark').textContent();
+  await write('Stack new pop');
+  await command('doit');
+  await idle();
+  await frame.locator('#result button[data-act="debug"]').click();
+  await frame.waitForFunction(() => !document.getElementById('debugger-pane').hidden);
+  assert(await frame.locator('#d-stack li[aria-selected=true]').textContent() === 'Stack>>pop', 'The debugger must open on Stack>>pop.');
+  assert(await marked() === 'error:', `The frame must mark the send it waits on: ${await marked()}`);
+  assert(await frame.locator('#d-title').textContent() === 'The stack is empty.', 'The debugger names the error.');
+  await frame.locator('#d-proceed').click();
+  await frame.waitForFunction(() => document.getElementById('debugger-pane').hidden && !document.getElementById('workspace-pane').hidden);
+  assert((await frame.locator('#result').textContent()).includes('nil'), 'Proceed answers nil from the error and runs on.');
+  assert(await frame.locator('#tab-debugger').isHidden(), 'With nothing to debug, the Debugger tab goes.');
+  passed('debugger');
+
+  // 17. Debug it stops before the first statement; Over steps one statement and shows the
+  // temps; Proceed ends it with the result where Do it would show it.
+  await write('| a | a := 3 + 4. a * 2');
+  await editor().focus();
+  await page.keyboard.press('Control+Shift+D');
+  await frame.waitForFunction(() => !document.getElementById('debugger-pane').hidden);
+  assert(await marked() === '+', 'Debug it marks the first send.');
+  await frame.locator('#d-over').click();
+  await frame.waitForFunction(() => document.querySelector('#d-source mark')?.textContent === '*');
+  const temps = await frame.locator('#d-fields button').evaluateAll(items => items.map(b => b.textContent));
+  assert(temps.includes('a7'), `Over must show a as 7: ${temps}`);
+  await frame.locator('#d-proceed').click();
+  await frame.waitForFunction(() => document.getElementById('debugger-pane').hidden);
+  assert((await frame.locator('#result').textContent()).includes('14'), 'Proceed shows the result.');
+  passed('debug it');
 
   // 10. A file without Slip's record types: Slip still runs, keeps nothing, and says how to
   // give the file the record types. This broker takes no proposals, so the button says so.

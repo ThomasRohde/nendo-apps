@@ -126,13 +126,15 @@ test('the hooks hear a class defined, a method compiled and a method removed', (
   assert.deepEqual(heard, ['class H', 'compiled H a', 'removed a']);
 });
 
-test('a long evaluation runs in slices, and stop interrupts it', async () => {
+test('a long evaluation runs in slices, and stop stops it for the debugger', async () => {
   const image = bootImage();
   let slices = 0;
   const evaluation = image.evaluate('[true] whileTrue: [3 + 4]', { slice: 5, yieldTo: fn => { slices++; if (slices === 4) evaluation.stop(); setImmediate(fn); } });
   const outcome = await evaluation;
   assert.ok(slices >= 4, `It must yield between slices, and yielded ${slices} times.`);
-  assert.ok(outcome.error?.interrupted, 'A stopped evaluation ends with an interruption.');
+  assert.equal(outcome.suspended?.suspended.kind, 'interrupt', 'A stopped evaluation waits, stopped, for the debugger.');
+  image.abandon(outcome.suspended);
+  assert.ok(outcome.suspended.done, 'Abandon ends it.');
 });
 
 test('a slice keeps to its budget', async () => {

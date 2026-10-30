@@ -1,11 +1,12 @@
 // What Slip's class browser and inspector show, read from an image. No page here: the view
 // draws it, and the tests read it.
 import { STClass, STObject, Closure, Context, F, Ch } from './vm/vm.mjs';
+import { OP } from './vm/compiler.mjs';
 
 export const ALL = '-- all --';
 /** Slip's keys, with Ctrl, and with Ctrl+Shift; none of them may be one of Nendo's own. */
 export const KEYS = { d: 'doit', p: 'printit', i: 'inspectit', '.': 'stop', s: 'keep' };
-export const KEYS_SHIFTED = { b: 'browseit' };
+export const KEYS_SHIFTED = { b: 'browseit', d: 'debugit' };
 export const SIDES = { instance: 'instance', class: 'class' };
 export const METHOD_TEMPLATE = 'messageSelectorAndArgumentNames\n\t"comment stating purpose of message"\n\n\t| temporary variable names |\n\tstatements';
 
@@ -145,4 +146,70 @@ export function moreIndexed(vm, value) {
 /** The inspector's title for an object: its class and printString. */
 export function titleOf(image, value) {
   return { className: image.vm.className(image.vm.classOf(value)), printed: printed(image, value) };
+}
+
+// ---- The debugger --------------------------------------------------------------------
+
+/** A frame's name, as a stack shows it: "Stack>>pop" or "[] in Stack>>pop". */
+export const frameLabel = (vm, ctx) => vm.stackOf(ctx, 1)[0] ?? '?';
+
+const methodOfFrame = ctx => ctx.method.methodClass ? ctx.method : ctx.method.method ?? null;
+
+/** The source a frame runs: its method's, or the doit's. */
+export const frameSource = ctx => methodOfFrame(ctx)?.source ?? '';
+
+const SELECTOR = /^(?:[A-Za-z_][A-Za-z0-9_]*:?|[-+*/\\<>=~@%|&?,]+)/;
+
+/**
+ * Where a frame is, as a range of its source: the send it waits on, or with next, the send it
+ * makes next (the frame a step stopped in). Null when the frame has no send there.
+ */
+export function frameRange(ctx, { next = false } = {}) {
+  const { code, positions } = ctx.method;
+  let best = -1, position = -1, first = -1, firstPosition = -1;
+  for (let i = 0; i < positions.length; i += 2) {
+    const at = positions[i], pos = positions[i + 1];
+    if (pos < 0 || (code[at] !== OP.SEND && code[at] !== OP.SUPER)) continue;
+    if (first < 0 || at < first) { first = at; firstPosition = pos; }
+    const fits = next ? at >= ctx.pc && (best < 0 || at < best) : at < ctx.pc && at > best;
+    if (fits) { best = at; position = pos; }
+  }
+  // A loop's jump back leaves no send after the pc: the next one is its first again.
+  if (position < 0 && next) position = firstPosition;
+  if (position < 0) return null;
+  const source = frameSource(ctx);
+  const word = SELECTOR.exec(source.slice(position))?.[0] ?? '';
+  return { start: position, end: position + Math.max(1, word.length) };
+}
+
+/** A frame's fields: self, then its temporaries and those of the blocks and method around it. */
+export function frameFields(vm, ctx) {
+  const out = [{ label: 'self', value: ctx.receiver ?? null }];
+  const seen = new Set(['self']);
+  for (let c = ctx; c; c = c.outer) {
+    const names = c.method.tempNames ?? [];
+    c.temps.forEach((value, i) => {
+      const label = names[i] ?? `temp ${i + 1}`;
+      if (seen.has(label)) return;
+      seen.add(label);
+      out.push({ label, value: value ?? null });
+    });
+  }
+  return out;
+}
+
+/** What a stopped process says: the exception's text, or why it stopped. */
+export function stoppedTitle(vm, proc) {
+  const { kind, exception } = proc.suspended ?? {};
+  if (kind === 'unhandled') return vm.exceptionText(exception);
+  if (kind === 'interrupt') return 'Stopped.';
+  if (kind === 'debug') return 'Debug it: stopped before the first statement.';
+  return 'Stepping.';
+}
+
+/** The frame the debugger shows first: the one that signalled, below the machinery. */
+export function firstFrame(vm, proc, frames) {
+  if (proc.suspended?.kind !== 'unhandled') return 0;
+  const at = frames.indexOf(vm.signallerContext(proc.suspended.exception));
+  return at < 0 ? 0 : at;
 }

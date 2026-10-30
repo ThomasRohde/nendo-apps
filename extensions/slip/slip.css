@@ -124,3 +124,17 @@ kbd{font:inherit;font-size:.72rem;padding:0 4px;border:1px solid var(--line-stro
 #i-eval{min-height:70px;height:90px;resize:vertical;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-raised);font:12.5px/1.5 var(--mono)}
 #i-eval:focus{outline:none;border-color:var(--cobalt)}
 #inspector .result{margin-top:0;max-height:20vh}
+
+/* The notifier an error or Stop leaves under the editor, and the debugger. */
+.result .actions{display:flex;gap:6px;margin-top:6px;font-family:system-ui,sans-serif}
+.result .actions button,.d-actions button{padding:3px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-raised);font-size:.85rem}
+.result .actions button.primary,.d-actions button:not(.quiet){border-color:color-mix(in srgb,var(--slip) 55%,var(--line-strong))}
+.d-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:8px}
+.d-title{flex:1 1 260px;color:var(--danger);font-weight:600;overflow-wrap:anywhere}
+.d-actions{display:flex;flex-wrap:wrap;gap:6px}
+.d-actions button:disabled{opacity:.5;cursor:default}
+.d-body{display:grid;grid-template-columns:minmax(150px,1fr) minmax(0,2.2fr) minmax(150px,1fr);gap:8px;flex:1;min-height:0}
+.d-source{margin:0;padding:10px 12px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface-raised);font:13px/1.55 var(--mono);tab-size:4;white-space:pre;overflow:auto;min-height:120px}
+.d-source mark{background:color-mix(in srgb,var(--tone-amber) 35%,transparent);color:inherit;border-radius:3px;outline:1px solid color-mix(in srgb,var(--tone-amber) 70%,transparent)}
+#d-fields{min-height:0}
+@media (max-width:760px){.d-body{grid-template-columns:1fr;grid-auto-rows:minmax(110px,auto)}}

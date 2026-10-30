@@ -17,6 +17,7 @@
         <span><kbd>Ctrl</kbd>+<kbd>P</kbd> Print it</span>
         <span><kbd>Ctrl</kbd>+<kbd>I</kbd> Inspect it</span>
         <span><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> Browse it</span>
+        <span><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> Debug it</span>
         <span><kbd>Ctrl</kbd>+<kbd>.</kbd> Stop</span>
         <span><kbd>Ctrl</kbd>+<kbd>S</kbd> Keep the page, accept a method</span>
       </p>
@@ -28,11 +29,13 @@
         <button type="button" data-command="printit">Print it</button>
         <button type="button" data-command="inspectit">Inspect it</button>
         <button type="button" data-command="browseit">Browse it</button>
+        <button type="button" data-command="debugit">Debug it</button>
         <button type="button" data-command="stop">Stop</button>
       </div>
       <div class="tabs" role="tablist" aria-label="Tools">
         <button id="tab-workspace" type="button" role="tab" aria-controls="workspace-pane">Workspace</button>
         <button id="tab-browser" type="button" role="tab" aria-controls="browser-pane">Browser</button>
+        <button id="tab-debugger" type="button" role="tab" aria-controls="debugger-pane" hidden>Debugger</button>
       </div>
       <section id="workspace-pane" class="pane" role="tabpanel" aria-labelledby="tab-workspace">
       <header class="page-head">
@@ -61,6 +64,23 @@
         </div>
         <textarea id="b-code" spellcheck="false" autocomplete="off" aria-label="Code: a method, a class definition or a comment"></textarea>
         <p id="b-problem" class="b-problem" role="alert" hidden></p>
+      </section>
+      <section id="debugger-pane" class="pane" role="tabpanel" aria-labelledby="tab-debugger" hidden>
+        <header class="d-head">
+          <strong id="d-title" class="d-title" role="status"></strong>
+          <div class="d-actions" role="group" aria-label="Debugger">
+            <button id="d-proceed" type="button" title="Run on to the end">Proceed</button>
+            <button id="d-restart" type="button" title="Run the chosen frame again from its start">Restart</button>
+            <button id="d-into" type="button" title="Stop at the next message sent">Into</button>
+            <button id="d-over" type="button" title="Stop at the chosen frame's next message">Over</button>
+            <button id="d-abandon" type="button" class="quiet" title="End the run; its ensure: blocks run">Abandon</button>
+          </div>
+        </header>
+        <div class="d-body">
+          <div class="column"><h2 id="d-stack-label">Stack</h2><ul id="d-stack" class="list" role="listbox" aria-labelledby="d-stack-label" tabindex="0"></ul></div>
+          <pre id="d-source" class="d-source" tabindex="0" aria-label="The chosen frame's source; the message it sends is marked"></pre>
+          <div class="column"><h2 id="d-fields-label">Variables</h2><ul id="d-fields" class="i-fields" aria-labelledby="d-fields-label"></ul></div>
+        </div>
       </section>
       <section id="transcript-pane" aria-label="Transcript">
         <header><h2>Transcript</h2><button id="clear-transcript" type="button" class="quiet">Clear</button></header>

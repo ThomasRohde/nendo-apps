@@ -2,7 +2,7 @@
 // answers a value, or FAIL, and then the method's Smalltalk code runs instead, which raises
 // the right error or handles the cases the primitive left out (a Fraction, for example). A
 // primitive that starts a new context itself (a block's value, perform:) answers SWITCHED.
-import { F, Ch, STObject, STClass, Method, Closure, Context, SmalltalkError } from './vm.mjs';
+import { F, Ch, STObject, STClass, Method, Closure, Context } from './vm.mjs';
 import { tokenize } from './parser.mjs';
 
 export const FAIL = Symbol('fail');
@@ -97,13 +97,41 @@ export function installPrimitives(vm) {
     return SWITCHED;
   });
   def('respondsTo', (r, [selector]) => vm.isSymbol(selector) && vm.lookup(vm.classOf(r), selector.s) !== null);
-  def('error', (r, [text]) => { throw new SmalltalkError(isStr(text) ? js(text) : vm.describe(text), { errorClass: 'Error' }); });
-  def('signalUnhandled', r => {
-    const text = r.f[0];
-    const name = vm.classOf(r).name;
-    throw new SmalltalkError(isStr(text) ? `${name}: ${js(text)}` : name, { errorClass: name });
-  });
-  def('halt', () => { throw new SmalltalkError('Halt. The debugger comes in a later step of Slip.', { errorClass: 'Halt' }); });
+
+  // ---- Exceptions and contexts ------------------------------------------------------
+  // An exception no handler took stops its process for the debugger. Proceed answers nil
+  // from defaultAction, so signal answers nil.
+  def('unhandled', (r, args, ctx) => { vm.ctx = ctx; vm.interrupt = { kind: 'unhandled', exception: r }; return SWITCHED; });
+  const live = fn => (r, args, ctx) => r instanceof Context ? fn(r, args, ctx) : FAIL;
+  def('ctxSender', live(r => r.sender ?? null));
+  def('ctxReceiver', live(r => r.receiver));
+  def('ctxReceiverPut', live((r, [value]) => { r.receiver = value; return r; }));
+  def('ctxMethod', live(r => r.method.methodClass ? r.method : r.method.method ?? null));
+  def('ctxTempAt', live((r, [i]) => typeof i === 'number' && i >= 1 && i <= r.temps.length ? r.temps[i - 1] : FAIL));
+  def('ctxTempAtPut', live((r, [i, value]) => { if (typeof i !== 'number' || i < 1 || i > r.temps.length) return FAIL; r.temps[i - 1] = value; return value; }));
+  def('ctxIsDead', live(r => r.dead));
+  def('ctxIsHandler', live(r => vm.isHandler(r)));
+  def('ctxIsUnwind', live(r => vm.isUnwind(r)));
+  def('ctxLabel', live(r => str(vm.stackOf(r, 1)[0] ?? '?')));
+  // Returns from a context on the active chain: every context above it ends. Unwind blocks
+  // have run already, in Smalltalk (Context>>return:).
+  def('ctxReturn', live((r, [value], ctx) => {
+    if (r.dead || !vm.onChain(ctx, r)) return FAIL;
+    for (let c = ctx; c !== r; c = c.sender) c.dead = true;
+    r.dead = true;
+    vm.ctx = ctx;
+    if (!r.sender) { vm.interrupt = { kind: 'end', value }; return SWITCHED; }
+    r.sender.stack.push(value);
+    vm.ctx = r.sender;
+    return SWITCHED;
+  }));
+  def('ctxRestart', live((r, args, ctx) => {
+    if (r.dead || !vm.onChain(ctx, r)) return FAIL;
+    for (let c = ctx; c !== r; c = c.sender) c.dead = true;
+    vm.restartContext(r);
+    vm.ctx = r;
+    return SWITCHED;
+  }));
 
   // ---- Classes --------------------------------------------------------------------
   const classOnly = fn => (r, args, ctx) => r instanceof STClass ? fn(r, args, ctx) : FAIL;

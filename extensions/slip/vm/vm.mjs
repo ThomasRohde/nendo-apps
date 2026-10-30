@@ -71,6 +71,12 @@ export class SmalltalkError extends Error {
 
 export const MAX_DEPTH = 20000;
 
+// An opcode the compiler never emits: the end of the context a VM error is signalled from. A
+// handler that returns or retries never reaches it; resuming past such an error does.
+const TRAP = 99;
+// The VM's own failures that stay JavaScript errors: no Smalltalk code can handle them.
+const fatal = error => !(error instanceof SmalltalkError) || error.fatal || error.interrupted;
+
 const NAMES = {
   // The kernel's classes: name, superclass, instance variables, format.
   // Behavior and its subclasses are created first, by hand, in boot().
@@ -111,12 +117,16 @@ const NAMES = {
     ['BlockClosure', 'Object', '', 'special'],
     ['CompiledMethod', 'Object', '', 'special'],
     ['Context', 'Object', '', 'special'],
-    ['Exception', 'Object', 'messageText', 'fixed'],
+    ['Exception', 'Object', 'messageText signalContext handlerContext outerContext', 'fixed'],
     ['Error', 'Exception', '', 'fixed'],
     ['ZeroDivide', 'Error', '', 'fixed'],
     ['MessageNotUnderstood', 'Error', 'message receiver', 'fixed'],
     ['SubscriptOutOfBounds', 'Error', '', 'fixed'],
     ['NotFound', 'Error', '', 'fixed'],
+    ['Notification', 'Exception', '', 'fixed'],
+    ['Warning', 'Exception', '', 'fixed'],
+    ['Halt', 'Exception', '', 'fixed'],
+    ['ExceptionSet', 'Object', 'exceptions', 'fixed'],
     ['SystemDictionary', 'Object', '', 'fixed'],
     ['Random', 'Object', '', 'fixed'],
     ['Time', 'Object', '', 'fixed'],
@@ -450,109 +460,132 @@ export class VM {
   }
 
   newProcess(context) {
-    return { ctx: context, done: false, value: undefined, error: null, interrupted: false, started: Date.now() };
+    return { ctx: context, done: false, value: undefined, error: null, interrupted: false, suspended: null, watch: null, started: Date.now() };
   }
 
   /**
-   * Runs a process until it ends or the time budget is spent. Answers true when it ended.
+   * Runs a process until it ends, stops for the debugger, or spends its time budget. Answers
+   * true when it ended or stopped (proc.done or proc.suspended), false when the budget ran out.
    * The interpreter: one switch over the opcodes. A send that runs Smalltalk code makes a new
-   * context the active one; a primitive answers at once.
+   * context the active one; a primitive answers at once. An error the VM raises is signalled
+   * as a Smalltalk Error from the context it happened in, so a handler can take it.
    */
   run(proc, budgetMs = Infinity) {
     const deadline = budgetMs === Infinity ? Infinity : performance.now() + budgetMs;
     let ctx = proc.ctx;
     let count = 0;
+    const watch = proc.watch;
+    let skip = watch?.skipFirst ?? false;
     this.active = proc;
+    this.interrupt = null;
     try {
       while (true) {
-        if (proc.interrupted) throw new SmalltalkError('Interrupted.', { interrupted: true });
-        if ((++count & 1023) === 0 && performance.now() > deadline) { proc.ctx = ctx; return false; }
-        const code = ctx.method.code;
-        const op = code[ctx.pc++];
-        switch (op) {
-          case OP.SELF: ctx.stack.push(ctx.receiver); break;
-          case OP.LIT: ctx.stack.push(code[ctx.pc++]); break;
-          case OP.NIL: ctx.stack.push(null); break;
-          case OP.TRUE: ctx.stack.push(true); break;
-          case OP.FALSE: ctx.stack.push(false); break;
-          case OP.TEMP: {
-            let c = ctx;
-            for (let d = code[ctx.pc++]; d > 0; d--) c = c.outer;
-            ctx.stack.push(c.temps[code[ctx.pc++]]);
-            break;
+        try {
+          while (true) {
+            if (proc.interrupted) { proc.interrupted = false; return this.suspend(proc, ctx, { kind: 'interrupt' }); }
+            if ((++count & 1023) === 0 && performance.now() > deadline) { proc.ctx = ctx; return false; }
+            const code = ctx.method.code;
+            const op = code[ctx.pc++];
+            switch (op) {
+              case OP.SELF: ctx.stack.push(ctx.receiver); break;
+              case OP.LIT: ctx.stack.push(code[ctx.pc++]); break;
+              case OP.NIL: ctx.stack.push(null); break;
+              case OP.TRUE: ctx.stack.push(true); break;
+              case OP.FALSE: ctx.stack.push(false); break;
+              case OP.TEMP: {
+                let c = ctx;
+                for (let d = code[ctx.pc++]; d > 0; d--) c = c.outer;
+                ctx.stack.push(c.temps[code[ctx.pc++]]);
+                break;
+              }
+              case OP.STORE_TEMP: {
+                let c = ctx;
+                for (let d = code[ctx.pc++]; d > 0; d--) c = c.outer;
+                c.temps[code[ctx.pc++]] = ctx.stack[ctx.stack.length - 1];
+                break;
+              }
+              case OP.IVAR: ctx.stack.push(ctx.receiver.f[code[ctx.pc++]]); break;
+              case OP.STORE_IVAR: ctx.receiver.f[code[ctx.pc++]] = ctx.stack[ctx.stack.length - 1]; break;
+              case OP.GLOBAL: {
+                const b = code[ctx.pc++];
+                if (b.undeclared && !(b.f[1])) throw new SmalltalkError(`${b.f[0].s} is not defined.`);
+                ctx.stack.push(b.f[1]);
+                break;
+              }
+              case OP.STORE_GLOBAL: code[ctx.pc++].f[1] = ctx.stack[ctx.stack.length - 1]; break;
+              case OP.POP: ctx.stack.pop(); break;
+              case OP.DUP: ctx.stack.push(ctx.stack[ctx.stack.length - 1]); break;
+              case OP.ARRAY: {
+                const n = code[ctx.pc++];
+                ctx.stack.push(this.array(ctx.stack.splice(ctx.stack.length - n, n)));
+                break;
+              }
+              case OP.BLOCK: ctx.stack.push(new Closure(this.classes.BlockClosure, code[ctx.pc++], ctx, ctx.receiver)); break;
+              case OP.THIS_CONTEXT: ctx.stack.push(ctx); break;
+              case OP.JUMP: ctx.pc = code[ctx.pc]; break;
+              case OP.JUMP_FALSE: case OP.JUMP_TRUE: {
+                const v = ctx.stack.pop();
+                const target = code[ctx.pc++];
+                if (v !== true && v !== false) throw new SmalltalkError(`${this.describe(v)} is not a Boolean, so it cannot choose a branch.`);
+                if (v === (op === OP.JUMP_TRUE)) ctx.pc = target;
+                break;
+              }
+              case OP.SEND: case OP.SUPER: {
+                // A step in the debugger stops before a send: the one the debugger shows next.
+                if (watch !== null) {
+                  if (skip) skip = false;
+                  else if (watch.test(ctx)) { ctx.pc--; return this.suspend(proc, ctx, { kind: 'step' }); }
+                }
+                const selector = code[ctx.pc++];
+                const argc = code[ctx.pc++];
+                this.ctx = ctx;
+                this.send(ctx, selector, argc, op === OP.SUPER);
+                ctx = this.ctx;
+                if (this.interrupt !== null) {
+                  const it = this.interrupt;
+                  this.interrupt = null;
+                  if (it.kind === 'end') { proc.done = true; proc.value = it.value; proc.ctx = null; return true; }
+                  return this.suspend(proc, ctx, it);
+                }
+                break;
+              }
+              case OP.RETURN: case OP.BLOCK_RETURN: {
+                const v = ctx.stack.pop();
+                ctx.dead = true;
+                const sender = ctx.sender;
+                if (!sender) { proc.done = true; proc.value = v; proc.ctx = null; return true; }
+                sender.stack.push(v);
+                ctx = sender;
+                break;
+              }
+              case OP.NONLOCAL_RETURN: {
+                const v = ctx.stack.pop();
+                const home = ctx.home;
+                if (home.dead) throw new SmalltalkError('A block tried to return from a method that has already returned.');
+                // An ensure: or ifCurtailed: on the way runs its block first, in Smalltalk.
+                if (this.unwindBetween(ctx, home)) {
+                  ctx.stack.push(ctx, v, home);
+                  this.ctx = ctx;
+                  this.send(ctx, 'nonLocalReturn:to:', 2, false);
+                  ctx = this.ctx;
+                  break;
+                }
+                // Every context between here and the home method ends with it.
+                for (let c = ctx; c && c !== home; c = c.sender) c.dead = true;
+                home.dead = true;
+                const sender = home.sender;
+                if (!sender) { proc.done = true; proc.value = v; proc.ctx = null; return true; }
+                sender.stack.push(v);
+                ctx = sender;
+                break;
+              }
+              case TRAP: throw new SmalltalkError(code[ctx.pc], { fatal: true });
+              default: throw new Error(`Bad opcode ${op} at ${ctx.pc - 1}`);
+            }
           }
-          case OP.STORE_TEMP: {
-            let c = ctx;
-            for (let d = code[ctx.pc++]; d > 0; d--) c = c.outer;
-            c.temps[code[ctx.pc++]] = ctx.stack[ctx.stack.length - 1];
-            break;
-          }
-          case OP.IVAR: ctx.stack.push(ctx.receiver.f[code[ctx.pc++]]); break;
-          case OP.STORE_IVAR: ctx.receiver.f[code[ctx.pc++]] = ctx.stack[ctx.stack.length - 1]; break;
-          case OP.GLOBAL: {
-            const b = code[ctx.pc++];
-            if (b.undeclared && !(b.f[1])) throw new SmalltalkError(`${b.f[0].s} is not defined.`);
-            ctx.stack.push(b.f[1]);
-            break;
-          }
-          case OP.STORE_GLOBAL: code[ctx.pc++].f[1] = ctx.stack[ctx.stack.length - 1]; break;
-          case OP.POP: ctx.stack.pop(); break;
-          case OP.DUP: ctx.stack.push(ctx.stack[ctx.stack.length - 1]); break;
-          case OP.ARRAY: {
-            const n = code[ctx.pc++];
-            ctx.stack.push(this.array(ctx.stack.splice(ctx.stack.length - n, n)));
-            break;
-          }
-          case OP.BLOCK: ctx.stack.push(new Closure(this.classes.BlockClosure, code[ctx.pc++], ctx, ctx.receiver)); break;
-          case OP.THIS_CONTEXT: ctx.stack.push(ctx); break;
-          case OP.JUMP: ctx.pc = code[ctx.pc]; break;
-          case OP.JUMP_FALSE: case OP.JUMP_TRUE: {
-            const v = ctx.stack.pop();
-            const target = code[ctx.pc++];
-            if (v !== true && v !== false) throw new SmalltalkError(`${this.describe(v)} is not a Boolean, so it cannot choose a branch.`);
-            if (v === (op === OP.JUMP_TRUE)) ctx.pc = target;
-            break;
-          }
-          case OP.SEND: case OP.SUPER: {
-            const selector = code[ctx.pc++];
-            const argc = code[ctx.pc++];
-            this.ctx = ctx;
-            this.send(ctx, selector, argc, op === OP.SUPER);
-            ctx = this.ctx;
-            break;
-          }
-          case OP.RETURN: {
-            const v = ctx.stack.pop();
-            ctx.dead = true;
-            const sender = ctx.sender;
-            if (!sender) { proc.done = true; proc.value = v; proc.ctx = null; return true; }
-            sender.stack.push(v);
-            ctx = sender;
-            break;
-          }
-          case OP.BLOCK_RETURN: {
-            const v = ctx.stack.pop();
-            ctx.dead = true;
-            const sender = ctx.sender;
-            if (!sender) { proc.done = true; proc.value = v; proc.ctx = null; return true; }
-            sender.stack.push(v);
-            ctx = sender;
-            break;
-          }
-          case OP.NONLOCAL_RETURN: {
-            const v = ctx.stack.pop();
-            const home = ctx.home;
-            if (home.dead) throw new SmalltalkError('A block tried to return from a method that has already returned.');
-            // Every context between here and the home method ends with it.
-            for (let c = ctx; c && c !== home; c = c.sender) c.dead = true;
-            home.dead = true;
-            const sender = home.sender;
-            if (!sender) { proc.done = true; proc.value = v; proc.ctx = null; return true; }
-            sender.stack.push(v);
-            ctx = sender;
-            break;
-          }
-          default: throw new Error(`Bad opcode ${op} at ${ctx.pc - 1}`);
+        } catch (error) {
+          if (fatal(error) || !this.canSignal(ctx)) throw error;
+          ctx = this.trapContext(ctx, error.message);
         }
       }
     } catch (error) {
@@ -565,6 +598,54 @@ export class VM {
     } finally {
       this.active = null;
     }
+  }
+
+  /** Stops a process for the debugger. kind: 'unhandled', 'interrupt', 'step' or 'debug'. */
+  suspend(proc, ctx, info) {
+    proc.ctx = ctx;
+    proc.suspended = info;
+    proc.watch = null;
+    return true;
+  }
+
+  // An Error can be signalled once the kernel has Exception>>signal, and while there is room
+  // on the stack for the handler search.
+  canSignal(ctx) {
+    return ctx !== null && ctx.depth < MAX_DEPTH - 200 && this.lookup(this.classes.Error, 'signal') !== null;
+  }
+
+  /** A context that signals an Error with the text, above the context the VM failed in. */
+  trapContext(ctx, text) {
+    const exception = new STObject(this.classes.Error, this.allInstVarNames(this.classes.Error).length);
+    exception.f[0] = this.str(text);
+    const m = new Method(this.classes.CompiledMethod);
+    Object.assign(m, { selector: 'vmError', numArgs: 0, numTemps: 0, positions: [], blocks: [], primitive: null, source: '', trap: true,
+      code: [OP.LIT, exception, OP.SEND, 'signal', 0, TRAP, `Slip cannot go on after this error: ${text}`] });
+    m.methodClass = this.classes.UndefinedObject;
+    return new Context(this.classes.Context, m, null, ctx, null, null);
+  }
+
+  isHandler(c) { return !c.closure && c.method.pragmas?.includes('handler') === true; }
+  isUnwind(c) { return !c.closure && c.method.pragmas?.includes('unwind') === true; }
+
+  /** Whether an ensure: or ifCurtailed: that has not run its block lies between two contexts. */
+  unwindBetween(from, to) {
+    for (let c = from.sender; c && c !== to; c = c.sender) if (this.isUnwind(c) && c.temps[1] === null) return true;
+    return false;
+  }
+
+  /** Whether a context is on the chain of senders from another, itself included. */
+  onChain(from, target) {
+    for (let c = from; c; c = c.sender) if (c === target) return true;
+    return false;
+  }
+
+  /** Puts a context back at its start: its arguments kept, its other temps and stack cleared. */
+  restartContext(c) {
+    c.pc = 0;
+    c.stack = [];
+    for (let i = c.method.numArgs; i < c.temps.length; i++) c.temps[i] = null;
+    c.dead = false;
   }
 
   send(ctx, selector, argc, isSuper) {
@@ -598,7 +679,7 @@ export class VM {
 
   activate(method, receiver, args, sender) {
     const c = new Context(this.classes.Context, method, receiver, sender, null, null);
-    if (c.depth > MAX_DEPTH) throw new SmalltalkError(`The recursion is too deep (more than ${MAX_DEPTH.toLocaleString('en')} calls).`);
+    if (c.depth > MAX_DEPTH) throw new SmalltalkError(`The recursion is too deep (more than ${MAX_DEPTH.toLocaleString('en')} calls).`, { fatal: true });
     for (let i = 0; i < args.length; i++) c.temps[i] = args[i];
     this.ctx = c;
   }
@@ -607,18 +688,68 @@ export class VM {
   activateBlock(closure, args, sender) {
     const block = closure.block;
     const c = new Context(this.classes.Context, block, closure.receiver, sender, closure.outer, closure);
-    if (c.depth > MAX_DEPTH) throw new SmalltalkError(`The recursion is too deep (more than ${MAX_DEPTH.toLocaleString('en')} calls).`);
+    if (c.depth > MAX_DEPTH) throw new SmalltalkError(`The recursion is too deep (more than ${MAX_DEPTH.toLocaleString('en')} calls).`, { fatal: true });
     for (let i = 0; i < args.length; i++) c.temps[i] = args[i];
     this.ctx = c;
   }
 
-  /** Sends a message and runs it to the end, here and now. For the tests and for printing. */
   /** Sends a message and runs it to its end; with a budget, a run that outlasts it is an error. */
   sendSync(receiver, selector, args = [], budgetMs = Infinity) {
     const proc = this.newProcess(this.sendContext(receiver, selector, args));
-    if (!this.run(proc, budgetMs) && !proc.done) throw new SmalltalkError(`#${selector} took longer than ${budgetMs} ms, so it was stopped.`);
+    if (!this.run(proc, budgetMs)) throw new SmalltalkError(`#${selector} took longer than ${budgetMs} ms, so it was stopped.`);
+    if (proc.suspended) this.endAsError(proc);
     if (proc.error) throw proc.error;
     return proc.value;
+  }
+
+  // ---- Exceptions, for the tools ----------------------------------------------------
+
+  /** The text an exception reports: its class and messageText; an Error's text alone. */
+  exceptionText(exception) {
+    const cls = this.classOf(exception);
+    const text = exception.f?.[0];
+    if (!this.isString(text)) return cls.name;
+    return cls === this.classes.Error ? this.js(text) : `${cls.name}: ${this.js(text)}`;
+  }
+
+  /**
+   * The context that raised an exception, below the machinery that signals it: Exception's
+   * own methods, Object>>error:, halt and doesNotUnderstand:, and a VM error's trap.
+   */
+  signallerContext(exception) {
+    const signal = exception?.f?.[1];
+    if (!(signal instanceof Context)) return null;
+    let c = signal;
+    while (c && this.isMachinery(c)) c = c.sender;
+    return c ?? signal;
+  }
+
+  isMachinery(c) {
+    const m = c.method.methodClass ? c.method : c.method.method;
+    if (!m || m.trap) return true;
+    const owner = this.instanceClass(m.methodClass);
+    for (let k = owner; k; k = k.superclass) if (k === this.classes.Exception) return true;
+    return owner === this.classes.Object && ['error:', 'halt', 'doesNotUnderstand:'].includes(m.selector);
+  }
+
+  /** Ends a stopped process as an error, for a caller with no debugger. */
+  endAsError(proc) {
+    const { kind, exception } = proc.suspended;
+    const failure = kind === 'unhandled'
+      ? new SmalltalkError(this.exceptionText(exception), { errorClass: this.classOf(exception).name })
+      : new SmalltalkError('Interrupted.', { interrupted: true });
+    failure.trace = this.stackOf(kind === 'unhandled' ? this.signallerContext(exception) ?? proc.ctx : proc.ctx);
+    proc.done = true;
+    proc.error = failure;
+    proc.ctx = null;
+    proc.suspended = null;
+  }
+
+  /** The contexts of a stopped process, innermost first, a VM error's trap left out. */
+  framesOf(proc, limit = 200) {
+    const out = [];
+    for (let c = proc.ctx; c && out.length < limit; c = c.sender) if (!c.method.trap) out.push(c);
+    return out;
   }
 
   // ---- Describing -------------------------------------------------------------------
@@ -641,6 +772,7 @@ export class VM {
   stackOf(ctx, limit = 40) {
     const lines = [];
     for (let c = ctx; c && lines.length < limit; c = c.sender) {
+      if (c.method.trap) continue;
       const m = c.method.methodClass ? c.method : c.method.method;
       const where = m ? `${this.className(m.methodClass)}>>${m.selector}` : '?';
       lines.push(c.closure ? `[] in ${where}` : where);
