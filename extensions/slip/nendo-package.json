@@ -1,0 +1,7 @@
+{
+  "packageId": "org.nendo.slip",
+  "title": "Slip",
+  "version": "0.1.0",
+  "entryPoint": "index.html",
+  "description": "A Smalltalk environment in the file. Evaluate in a Workspace, print results, watch the Transcript; the classes and methods you make are kept as records."
+}

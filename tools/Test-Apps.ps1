@@ -19,6 +19,7 @@ $lanes = [ordered]@{
     Brandkits        = 'Brandkits'
     Garden           = 'Garden'
     Terrain          = 'Terrain, Wardley maps'
+    Slip             = 'Slip'
 }
 if ($Lane) {
     # pwsh -File passes -Lane Gantt,Deck as one string.

@@ -15,6 +15,7 @@ This is for changing the apps. To use them, the [README](README.md) is all you n
 | Garden | [`extensions/garden`](extensions/garden/README.md) | `workspace/Garden.nendo` | `Review-Garden.ps1` |
 | Terrain | [`extensions/terrain`](extensions/terrain/README.md) | `workspace/Terrain.nendo` | `Review-Terrain.ps1` |
 | Clay | [`extensions/clay`](extensions/clay/README.md) | `workspace/Clay.nendo` | none |
+| Slip | [`extensions/slip`](extensions/slip/README.md) | `workspace/Slip.nendo` (to come) | `Review-Slip.ps1` |
 
 Billable, Envelope, Desk, Sketchboard, Dynamo and Casefile were built in the file by an agent;
 their views have no source folder here, and the file is the source. **Export…** in
