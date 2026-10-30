@@ -211,10 +211,10 @@ export const STAGES = {
       const movements = t.add('tr.component.page.movements', 'relatedList', componentPage, { targetEntityId: E.movement, viaFieldId: F.movement.component, title: 'Movements' });
       t.bindings(movements, [F.movement.to, F.movement.kind, F.movement.evolvedName]);
 
-      const assessmentPage = t.add('tr.assessment.page', 'detailSurface', null, { definitionVersion: 3, entityId: E.assessment, title: 'Assessment', titleFieldId: F.assessment.component, accentFieldId: F.assessment.status });
-      t.bindings(assessmentPage, [F.assessment.date, F.assessment.evolution, F.assessment.method, F.assessment.status, F.assessment.by, F.assessment.note]);
-      const placementPage = t.add('tr.placement.page', 'detailSurface', null, { definitionVersion: 3, entityId: E.placement, title: 'Placement', titleFieldId: F.placement.component });
-      t.bindings(placementPage, [F.placement.map, F.placement.visibility, F.placement.evolution, F.placement.labelX, F.placement.labelY, F.placement.pipelineFrom, F.placement.pipelineTo, F.placement.order]);
+      const assessmentPage = t.add('tr.assessment.page', 'detailSurface', null, { definitionVersion: 3, entityId: E.assessment, title: 'Assessment', accentFieldId: F.assessment.status });
+      t.bindings(assessmentPage, [F.assessment.component, F.assessment.date, F.assessment.evolution, F.assessment.method, F.assessment.status, F.assessment.by, F.assessment.note]);
+      const placementPage = t.add('tr.placement.page', 'detailSurface', null, { definitionVersion: 3, entityId: E.placement, title: 'Placement' });
+      t.bindings(placementPage, [F.placement.component, F.placement.map, F.placement.visibility, F.placement.evolution, F.placement.labelX, F.placement.labelY, F.placement.pipelineFrom, F.placement.pipelineTo, F.placement.order]);
       const linkPage = t.add('tr.link.page', 'detailSurface', null, { definitionVersion: 3, entityId: E.link, title: 'Link', titleFieldId: F.link.label, accentFieldId: F.link.kind });
       t.bindings(linkPage, [F.link.from, F.link.to, F.link.kind, F.link.flow, F.link.line]);
       return t.asMutations('The lists and the record pages');

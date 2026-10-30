@@ -36,6 +36,17 @@ test('every field the model names is declared, numbers as Decimal and references
   assert.deepEqual([...CREATE_ORDER].sort(), Object.values(E).sort());
 });
 
+test('a page is headed by a stored Text field, as Nendo requires (NUI340)', async () => {
+  const fields = new Map(schemaOps().filter(o => o.operationType === 'schema.addField').map(o => [o.payload.fieldId, o.payload]));
+  const nodes = (await STAGES.screens.mutations({ applicationId: 'app', read: {} })).flatMap(m => m.operations).filter(o => o.operationType === 'ui.addNode');
+  const pages = nodes.filter(o => o.payload.kind === 'detailSurface');
+  assert.ok(pages.length > 0);
+  for (const page of pages) {
+    const title = page.payload.properties.titleFieldId;
+    if (title !== undefined) assert.equal(fields.get(title)?.storageKind, 'Text', `${page.payload.nodeId} is headed by ${title}`);
+  }
+});
+
 test('the package declares one setting for each validator rule, and the view reads them by that name', async () => {
   const { manifest, files } = await packageFiles(PACKAGE_FOLDER);
   assert.equal(manifest.packageId, PACKAGE_ID);
