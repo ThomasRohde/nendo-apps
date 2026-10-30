@@ -6,6 +6,8 @@ import { Image, KERNEL_FILES } from './vm/image.mjs';
 import { STClass } from './vm/vm.mjs';
 import { E, F, SIDE, SETUP_TITLE, schemaOperations, hasSchema, classValues, methodValues, methodKey, recordMethodKey, valuesDiffer,
   definitionOrder, loadRecords, defineFromValues, compileFromValues } from './records.mjs';
+import { classNamed as classOfWord, KEYS, KEYS_SHIFTED } from './tools.mjs';
+import { createBrowser, createInspector } from './panes.mjs';
 
 const nendo = window.nendo ?? null;
 const $ = id => document.getElementById(id);
@@ -45,6 +47,9 @@ let outsideCount = 0;
 let armed = false;
 // What the lane reads: whether Slip has started, and its image.
 window.slip = { ready: false, get image() { return image; }, get persisting() { return persisting; }, get running() { return Boolean(running); } };
+let tab = 'workspace';
+let activeEditor = 'editor';  // the text area Do it, Print it and the others act on
+let browser = null, inspector = null;
 
 // ---- Small helpers -------------------------------------------------------------------
 
@@ -381,8 +386,7 @@ async function deletePage() {
 // ---- Evaluating ----------------------------------------------------------------------
 
 // The selection, or the line the caret is on when nothing is selected; selects what it took.
-function takeSource() {
-  const editor = $('editor');
+function takeSource(editor) {
   let start = editor.selectionStart, end = editor.selectionEnd;
   if (start === end) {
     start = editor.value.lastIndexOf('\n', start - 1) + 1;
@@ -393,39 +397,65 @@ function takeSource() {
   return { source: editor.value.slice(start, end), start, end };
 }
 
-async function evaluate(print) {
+// Each text area shows what it evaluated in its own box; in the inspector, self is the object.
+const RESULT_BOX = { editor: 'result', 'i-eval': 'i-result', 'b-code': 'b-problem' };
+
+/** Evaluates in the active text area. how: 'do', 'print' or 'inspect'. */
+async function evaluate(how) {
   if (running) { say('Slip is still running. Press Ctrl+. to stop it.'); return; }
-  const { source, start, end } = takeSource();
+  const id = activeEditor;
+  const editor = $(id);
+  const { source, start, end } = takeSource(editor);
   if (!source.trim()) { say('Select something to evaluate.'); return; }
-  running = image.evaluate(source);
+  const receiver = id === 'i-eval' ? inspector.value : null;
+  running = image.evaluate(source, { receiver });
   renderRunning();
   let outcome;
   try { outcome = await running; } finally { running = null; renderRunning(); }
-  const editor = $('editor');
-  if (outcome.error) { showError(outcome.error, start); return; }
-  const printed = image.printString(outcome.value);
-  if (print && editor.value.slice(start, end) === source) {
+  browser.render();
+  if (inspector.open && how !== 'inspect') inspector.render();
+  renderTally();
+  if (outcome.error) { showError(outcome.error, start, id); return; }
+  if (how === 'inspect') { $(RESULT_BOX[id]).hidden = true; inspector.inspect(outcome.value); return; }
+  const printed = image.printString(outcome.value, 1000);
+  if (how === 'print' && editor.value.slice(start, end) === source) {
     editor.setRangeText(` ${printed}`, end, end, 'select');
     editor.focus();
-    edited();
-    $('result').hidden = true;
-  } else showResult(printed, outcome.ms);
+    if (id === 'editor') edited();
+    else editor.dispatchEvent(new Event('input'));
+    $(RESULT_BOX[id]).hidden = true;
+  } else showResult(printed, outcome.ms, id);
 }
 
-function showResult(printed, ms) {
-  const box = $('result');
+/** Opens the browser on the class the selection, or the word at the caret, names. */
+function browseIt() {
+  const editor = $(activeEditor);
+  let start = editor.selectionStart, end = editor.selectionEnd;
+  if (start === end) {
+    while (start > 0 && /[A-Za-z0-9_]/.test(editor.value[start - 1])) start--;
+    while (end < editor.value.length && /[A-Za-z0-9_]/.test(editor.value[end])) end++;
+  }
+  const word = editor.value.slice(start, end);
+  const cls = classOfWord(vm, word) ?? (inspector.open && activeEditor === 'i-eval' && !word.trim() ? vm.classOf(inspector.value) : null);
+  if (!cls) { say(word.trim() ? `There is no class named ${word.trim()}.` : 'Put the caret on a class name to browse it.'); return; }
+  showTab('browser');
+  browser.browse(cls.isMeta ? cls.thisClass : cls);
+}
+
+function showResult(printed, ms, id = 'editor') {
+  const box = $(RESULT_BOX[id]);
   box.classList.remove('problem');
   box.replaceChildren(h('span', { class: 'ok' }, '✓ '), printed, h('span', { class: 'trace' }, `${Math.max(1, Math.round(ms))} ms`));
   box.hidden = false;
 }
 
-function showError(error, start) {
-  const box = $('result');
+function showError(error, start, id = 'editor') {
+  const box = $(RESULT_BOX[id]);
   box.classList.add('problem');
   const title = error.interrupted ? 'Stopped.' : error.message;
   box.replaceChildren(h('span', { class: 'title' }, title), ...(error.trace?.length && !error.interrupted ? [h('span', { class: 'trace' }, error.trace.join('\n'))] : []));
   box.hidden = false;
-  if (error.position !== undefined) { const at = start + error.position; $('editor').focus(); $('editor').setSelectionRange(at, at); }
+  if (error.position !== undefined) { const at = start + error.position; $(id).focus(); $(id).setSelectionRange(at, at); }
 }
 
 function stop() {
@@ -434,9 +464,23 @@ function stop() {
 }
 
 function run(command) {
-  if (command === 'doit') evaluate(false);
-  else if (command === 'printit') evaluate(true);
+  if (command === 'doit') evaluate('do');
+  else if (command === 'printit') evaluate('print');
+  else if (command === 'inspectit') evaluate('inspect');
+  else if (command === 'browseit') browseIt();
+  else if (command === 'keep') keep();
   else if (command === 'stop') stop();
+}
+
+function showTab(name) {
+  tab = name === 'browser' ? 'browser' : 'workspace';
+  remember('slip.tab', tab);
+  $('workspace-pane').hidden = tab !== 'workspace';
+  $('browser-pane').hidden = tab !== 'browser';
+  $('tab-workspace').setAttribute('aria-selected', String(tab === 'workspace'));
+  $('tab-browser').setAttribute('aria-selected', String(tab === 'browser'));
+  if (activeEditor !== 'i-eval') activeEditor = tab === 'browser' ? 'b-code' : 'editor';
+  if (tab === 'browser') browser.render();
 }
 
 // ---- Drawing -------------------------------------------------------------------------
@@ -447,6 +491,7 @@ function render() {
   renderTally();
   renderNotices();
   renderRunning();
+  browser?.render();
 }
 
 function renderPages() {
@@ -497,6 +542,8 @@ function renderRunning() {
     nendo.ui.setToolbar({ items: [
       { kind: 'button', id: 'doit', label: 'Do it', disabled: Boolean(running) },
       { kind: 'button', id: 'printit', label: 'Print it', disabled: Boolean(running) },
+      { kind: 'button', id: 'inspectit', label: 'Inspect it', disabled: Boolean(running) },
+      { kind: 'button', id: 'browseit', label: 'Browse it', disabled: Boolean(running) },
       { kind: 'button', id: 'stop', label: 'Stop', disabled: !running },
     ] }).catch(() => { $('own-toolbar').hidden = false; });
   } else {
@@ -514,10 +561,17 @@ function applyTheme(theme) {
 document.addEventListener('keydown', event => {
   if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
   const key = event.key.toLowerCase();
-  const command = { d: 'doit', p: 'printit', '.': 'stop' }[key];
-  if (command) { event.preventDefault(); run(command); return; }
-  if (key === 's') { event.preventDefault(); const page = currentPage(); if (page) { page.source = $('editor').value; savePage(page); } }
+  // Ctrl+B is Nendo's own key, which api.js hands to the Workbench; Browse it takes Ctrl+Shift+B.
+  const command = event.shiftKey ? KEYS_SHIFTED[key] : KEYS[key];
+  if (command) { event.preventDefault(); run(command); }
 });
+
+// Ctrl+S: in the browser it accepts the code; elsewhere it keeps the Workspace page now.
+function keep() {
+  if (activeEditor === 'b-code' || document.activeElement?.closest?.('#browser-pane')) { browser.acceptCode(); return; }
+  const page = currentPage();
+  if (page) { page.source = $('editor').value; savePage(page); }
+}
 $('editor').addEventListener('keydown', event => {
   if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey) return;
   event.preventDefault();
@@ -531,8 +585,19 @@ $('title').addEventListener('keydown', event => { if (event.key === 'Enter') { e
 $('new-page').addEventListener('click', () => { const page = newPage(); show(page); savePage(page); $('editor').focus(); });
 $('delete-page').addEventListener('click', deletePage);
 $('clear-transcript').addEventListener('click', () => { transcriptText = ''; $('transcript').textContent = ''; });
+for (const id of Object.keys(RESULT_BOX)) $(id).addEventListener('focus', () => { activeEditor = id; });
+$('tab-workspace').addEventListener('click', () => showTab('workspace'));
+$('tab-browser').addEventListener('click', () => showTab('browser'));
 $('own-toolbar').addEventListener('click', event => { const command = event.target.closest('button')?.dataset.command; if (command) run(command); });
 window.addEventListener('pagehide', () => { const page = currentPage(); if (page) { page.source = $('editor').value; savePage(page); } });
+
+browser = createBrowser({ image: () => image, h, say, remember, recall, changed: () => renderTally() });
+inspector = createInspector({ image: () => image, h, say,
+  open: on => {
+    $('inspector').hidden = !on;
+    $('app').dataset.inspecting = String(on);
+    if (!on && activeEditor === 'i-eval') activeEditor = tab === 'browser' ? 'b-code' : 'editor';
+  } });
 
 async function start() {
   try {
@@ -542,6 +607,7 @@ async function start() {
     const wanted = pages.find(p => p.id === recall('slip.page')) ?? pages[0] ?? newPage('Workspace', FIRST_PAGE);
     show(wanted);
     savePage(wanted);
+    showTab(recall('slip.tab') ?? 'workspace');
   } catch (error) {
     $('tally').textContent = 'Not started';
     say(`Slip could not start: ${error.message}`, { problem: true });

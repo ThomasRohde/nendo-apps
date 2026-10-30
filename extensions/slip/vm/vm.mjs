@@ -613,9 +613,10 @@ export class VM {
   }
 
   /** Sends a message and runs it to the end, here and now. For the tests and for printing. */
-  sendSync(receiver, selector, args = []) {
+  /** Sends a message and runs it to its end; with a budget, a run that outlasts it is an error. */
+  sendSync(receiver, selector, args = [], budgetMs = Infinity) {
     const proc = this.newProcess(this.sendContext(receiver, selector, args));
-    this.run(proc);
+    if (!this.run(proc, budgetMs) && !proc.done) throw new SmalltalkError(`#${selector} took longer than ${budgetMs} ms, so it was stopped.`);
     if (proc.error) throw proc.error;
     return proc.value;
   }

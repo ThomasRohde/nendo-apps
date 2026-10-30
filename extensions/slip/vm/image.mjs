@@ -111,9 +111,12 @@ export class Image {
     return { value: proc.value, error: proc.error };
   }
 
-  /** The printString of a value, or a plain description when printString itself fails. */
-  printString(value) {
-    try { return this.vm.js(this.vm.sendSync(value, 'printString')); }
+  /**
+   * The printString of a value, or a plain description when printString itself fails. With a
+   * budget, a printOn: that runs too long is stopped and described instead.
+   */
+  printString(value, budgetMs = Infinity) {
+    try { return this.vm.js(this.vm.sendSync(value, 'printString', [], budgetMs)); }
     catch (error) { return `${this.vm.describe(value)} (printString failed: ${error.message})`; }
   }
 
@@ -131,10 +134,11 @@ export class Image {
 
   /**
    * Evaluates a doit in time slices of about 8 ms, yielding to the page between them.
-   * Answers a promise of {value, error, ms}. evaluation.stop() interrupts it.
+   * Answers a promise of {value, error, ms}. evaluation.stop() interrupts it. With a receiver,
+   * self in the doit is that object, as in an inspector.
    */
-  evaluate(source, { slice = 8, yieldTo = defaultYield } = {}) {
-    const proc = this.process(source);
+  evaluate(source, { slice = 8, yieldTo = defaultYield, receiver = null } = {}) {
+    const proc = this.process(source, receiver);
     const started = performance.now();
     const promise = new Promise(resolve => {
       const step = () => {
