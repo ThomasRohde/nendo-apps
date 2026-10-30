@@ -15,7 +15,8 @@ host to work; when it does, that is a host change made and gated in `../nendo`.
 The work is planned in the host's Nendo Development planner, as for the host: read
 `../nendo/docs/dogfooding.md` and use the registered `nendo` MCP server (`.mcp.json`,
 `.codex/config.toml`, port 41787). Name a work item by its Reference and title, read its
-Decision standing first, author and let the person accept, and record exact check outcomes.
+Decision standing first, write planner records directly over MCP (only a definition change
+goes as a proposal the person accepts), and record exact check outcomes.
 
 ## Which gate a change needs
 
