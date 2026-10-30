@@ -245,8 +245,7 @@ error: aString
 	^Error new signal: aString
 !
 halt
-	<primitive: 'halt'>
-	^self
+	^Halt new signal
 !
 assert: aBlockOrBoolean
 	aBlockOrBoolean value ifFalse: [^self error: 'Assertion failed']

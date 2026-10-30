@@ -26,6 +26,7 @@ class Scope {
     this.isReal = real;
     this.owner = real ? this : parent.owner;
     this.count = 0;              // temps allocated, for a real scope
+    this.names = [];             // a real scope's temp names by index, its inlined blocks' too
     this.realDepth = real ? (parent ? parent.realDepthOf() + 1 : 0) : parent.realDepth;
   }
   realDepthOf() { return this.realDepth; }
@@ -33,6 +34,7 @@ class Scope {
     if (RESERVED.has(name)) throw new CompileError(`${name} is a reserved word and cannot be a variable.`, position);
     if (this.vars.has(name)) throw new CompileError(`${name} is declared twice.`, position);
     const index = this.owner.count++;
+    this.owner.names[index] = name;
     this.vars.set(name, { index, kind });
     return index;
   }
@@ -112,7 +114,7 @@ class Compiler {
     }
     return {
       selector: tree.selector, numArgs: tree.args.length, numTemps: scope.count,
-      argNames: tree.args.map(a => a.name), tempNames: [...scope.vars.keys()],
+      argNames: tree.args.map(a => a.name), tempNames: scope.names,
       code: unit.code, positions: unit.positions, blocks: unit.blocks,
       primitive: primitiveName, pragmas: tree.pragmas.map(p => p.keyword), source: this.source,
     };
@@ -243,7 +245,7 @@ class Compiler {
     this.unit = outerUnit; this.scope = outerScope; this.inBlock = outerInBlock;
     const block = {
       numArgs: node.params.length, numTemps: scope.count, code: unit.code, positions: unit.positions,
-      blocks: unit.blocks, argNames: node.params.map(p => p.name), tempNames: [...scope.vars.keys()],
+      blocks: unit.blocks, argNames: node.params.map(p => p.name), tempNames: scope.names,
       start: node.start, end: node.end,
     };
     outerUnit.blocks.push(block);

@@ -16,8 +16,18 @@ A Smalltalk environment in a Nendo file. `workspace/Slip.nendo` opens on it (`sl
   `Object subclass: #Greeter instanceVariableNames: 'name' classVariableNames: '' package: 'Mine'`,
   then `Greeter compile: '...' classified: 'greeting'`. Each one is kept in the file as a record
   the moment it compiles.
-- **Errors** show their message and the stack under the editor. A parse error puts the caret
-  where the parser stopped.
+- **Exceptions** are ANSI's: `on:do:`, `ensure:`, `ifCurtailed:`, `signal`, `return:`,
+  `retry`, `resume:`, `pass`, `outer` and `ExceptionSet` (`ZeroDivide, Warning`). An error the VM
+  finds (a non-Boolean in `ifTrue:`, a dead block's `^`) is an `Error` a handler can take.
+- **An exception no handler takes**, or **Stop** (Ctrl+.), stops the run and leaves a notifier
+  under the editor: the message, the stack, and **Debug**, **Proceed** (the `signal` answers nil)
+  and **Abandon** (its `ensure:` blocks run). A parse error puts the caret where the parser
+  stopped.
+- **The Debugger** tab shows the stopped run's stack, the chosen frame's source with the send it
+  waits on marked, and its variables; choose one to inspect it. **Into** stops at the next send,
+  **Over** at the chosen frame's next send, **Restart** runs the frame again from its start, and
+  **Proceed** and **Abandon** end it. **Debug it** (Ctrl+Shift+D) opens the selection in the
+  debugger before its first statement. `self halt` stops a run there.
 - **The Browser** tab lists packages, classes, protocols and methods. A package lists its own
   classes, then in italics the classes it adds methods to (a protocol such as `*Examples`). Choose a
   method to read and change it; **Accept** (Ctrl+S) compiles it and keeps it. With no method
@@ -39,24 +49,25 @@ A Smalltalk environment in a Nendo file. `workspace/Slip.nendo` opens on it (`sl
   of about 8 ms, so a long run never freezes the page (`image.mjs`).
 - `kernel/` is the class library in chunk format: a fresh Smalltalk-80 kernel with Pharo syntax
   additions, loaded each time the view starts.
-- `tools.mjs` reads what the browser and the inspector show from the image, and `panes.mjs`
-  draws them. A printString the inspector asks for is stopped after 200 ms, so a `printOn:` that
+- `tools.mjs` reads what the browser, the inspector and the debugger show from the image, and
+  `panes.mjs` draws them. A printString the inspector asks for is stopped after 200 ms, so a `printOn:` that
   never ends cannot hang the page.
 - `records.mjs` maps classes, methods and pages to three record types: `st.class`, `st.method`
   and `st.snippet`. On start Slip compiles the file's classes and methods into the image; after
   that every class defined and method compiled is written back, one write at a time. A change
   from outside (another client, an undo) is compiled when it arrives and named in a notice.
+- Exceptions are Smalltalk (`kernel/Exception.st`): `signal` walks the senders for an `on:do:`
+  context, and a return that passes an `ensure:` context runs its block. The VM has a few
+  context primitives for this, and stops a process for the debugger when `defaultAction` finds
+  no handler. A debugger step runs the process until the next send it is watching for.
 - Objects are not kept: what a doit makes lives until the view closes. Code is the durable part.
 - A file without the three record types still runs Slip, keeps nothing, and offers to ask Nendo
   for them as a proposal (`Slip: keep Smalltalk classes, methods and Workspace pages in this file`).
 
-Not in this version: exception handling (`on:do:`, `ensure:`) and the debugger. They come in a
-later step of the work item.
-
 ## Build and check
 
 - The lane is `pwsh ./tools/Test-Apps.ps1 -Lane Slip` (`tools/Review-Slip.ps1`): the node tests
-  in `tools/slip/` (kernel conformance, language, records, package, browser and inspector), then `tools/Gate-Slip.mjs`
+  in `tools/slip/` (kernel conformance, language, exceptions and debugger, records, package, browser and inspector), then `tools/Gate-Slip.mjs`
   against the host's fixture broker.
 - `node tools/Build-Slip.mjs --endpoint http://127.0.0.1:PORT/mcp --accept` builds the app into
   an empty, host-created file at Unattended: the record types, the package and the view, then

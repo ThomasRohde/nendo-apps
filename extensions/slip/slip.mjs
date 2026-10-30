@@ -6,8 +6,8 @@ import { Image, KERNEL_FILES } from './vm/image.mjs';
 import { STClass } from './vm/vm.mjs';
 import { E, F, SIDE, SETUP_TITLE, schemaOperations, hasSchema, classValues, methodValues, methodKey, recordMethodKey, valuesDiffer,
   definitionOrder, loadRecords, defineFromValues, compileFromValues } from './records.mjs';
-import { classNamed as classOfWord, KEYS, KEYS_SHIFTED } from './tools.mjs';
-import { createBrowser, createInspector } from './panes.mjs';
+import { classNamed as classOfWord, KEYS, KEYS_SHIFTED, stoppedTitle } from './tools.mjs';
+import { createBrowser, createInspector, createDebugger } from './panes.mjs';
 
 const nendo = window.nendo ?? null;
 const $ = id => document.getElementById(id);
@@ -46,10 +46,15 @@ let unsaved = { classes: new Set(), methods: new Map() }; // made before the fil
 let outsideCount = 0;
 let armed = false;
 // What the lane reads: whether Slip has started, and its image.
-window.slip = { ready: false, get image() { return image; }, get persisting() { return persisting; }, get running() { return Boolean(running); } };
+window.slip = { ready: false, get image() { return image; }, get persisting() { return persisting; }, get running() { return Boolean(running); },
+  get stopped() { return Boolean(stopped); }, get debugging() { return Boolean(debug?.process); } };
 let tab = 'workspace';
 let activeEditor = 'editor';  // the text area Do it, Print it and the others act on
-let browser = null, inspector = null;
+let browser = null, inspector = null, debug = null;
+// A run that stopped for the debugger, shown as a notifier under its text area, and where a
+// run the debugger has came from: { proc, id, how, source, start, end }.
+let stopped = null;
+let debugging = null;
 
 // ---- Small helpers -------------------------------------------------------------------
 
@@ -400,21 +405,35 @@ function takeSource(editor) {
 // Each text area shows what it evaluated in its own box; in the inspector, self is the object.
 const RESULT_BOX = { editor: 'result', 'i-eval': 'i-result', 'b-code': 'b-problem' };
 
+/** Runs an evaluation to its end or its stop, with Stop offered meanwhile. */
+async function track(evaluation) {
+  running = evaluation;
+  renderRunning();
+  let outcome;
+  try { outcome = await evaluation; } finally { running = null; renderRunning(); }
+  browser.render();
+  if (inspector.open) inspector.render();
+  renderTally();
+  return outcome;
+}
+
 /** Evaluates in the active text area. how: 'do', 'print' or 'inspect'. */
 async function evaluate(how) {
   if (running) { say('Slip is still running. Press Ctrl+. to stop it.'); return; }
+  dropStopped();
   const id = activeEditor;
-  const editor = $(id);
-  const { source, start, end } = takeSource(editor);
+  const { source, start, end } = takeSource($(id));
   if (!source.trim()) { say('Select something to evaluate.'); return; }
   const receiver = id === 'i-eval' ? inspector.value : null;
-  running = image.evaluate(source, { receiver });
-  renderRunning();
-  let outcome;
-  try { outcome = await running; } finally { running = null; renderRunning(); }
-  browser.render();
-  if (inspector.open && how !== 'inspect') inspector.render();
-  renderTally();
+  const origin = { id, how, source, start, end };
+  finish(await track(image.evaluate(source, { receiver })), origin);
+}
+
+/** Shows how a run ended, or the notifier for one that stopped. */
+function finish(outcome, origin) {
+  const { id, how, source, start, end } = origin;
+  const editor = $(id);
+  if (outcome.suspended) { showStopped(outcome.suspended, origin); return; }
   if (outcome.error) { showError(outcome.error, start, id); return; }
   if (how === 'inspect') { $(RESULT_BOX[id]).hidden = true; inspector.inspect(outcome.value); return; }
   const printed = image.printString(outcome.value, 1000);
@@ -425,6 +444,74 @@ async function evaluate(how) {
     else editor.dispatchEvent(new Event('input'));
     $(RESULT_BOX[id]).hidden = true;
   } else showResult(printed, outcome.ms, id);
+}
+
+/** The notifier: why the run stopped, where, and Debug, Proceed or Abandon. */
+function showStopped(proc, origin) {
+  stopped = { proc, ...origin };
+  const { kind, exception } = proc.suspended;
+  const from = kind === 'unhandled' ? vm.signallerContext(exception) ?? proc.ctx : proc.ctx;
+  const box = $(RESULT_BOX[origin.id]);
+  box.classList.add('problem');
+  box.replaceChildren(h('span', { class: 'title' }, stoppedTitle(vm, proc)), h('span', { class: 'trace' }, vm.stackOf(from, 8).join('\n')),
+    h('span', { class: 'actions' },
+      h('button', { type: 'button', class: 'primary', 'data-act': 'debug', onclick: debugStopped }, 'Debug'),
+      h('button', { type: 'button', 'data-act': 'proceed', onclick: proceedStopped }, 'Proceed'),
+      h('button', { type: 'button', 'data-act': 'abandon', onclick: () => { dropStopped(); box.hidden = true; } }, 'Abandon')));
+  box.hidden = false;
+}
+
+/** Abandons the run the notifier holds, if any: its ensure: blocks run. */
+function dropStopped() {
+  if (!stopped) return;
+  const problem = image.abandon(stopped.proc);
+  stopped = null;
+  if (problem) say(`An ensure: block failed: ${problem}`, { problem: true });
+}
+
+async function proceedStopped() {
+  if (!stopped || running) return;
+  const { proc, ...origin } = stopped;
+  stopped = null;
+  finish(await track(image.continue(proc)), origin);
+}
+
+function debugStopped() {
+  if (!stopped) return;
+  const { proc, ...origin } = stopped;
+  stopped = null;
+  $(RESULT_BOX[origin.id]).hidden = true;
+  openDebugger(proc, origin);
+}
+
+function openDebugger(proc, origin) {
+  if (debug.process && debug.process !== proc) image.abandon(debug.process);
+  debugging = origin;
+  debug.open(proc);
+  showTab('debugger');
+}
+
+/** Debug it: the selection in the debugger, stopped before its first statement. */
+function debugIt() {
+  if (running) { say('Slip is still running. Press Ctrl+. to stop it.'); return; }
+  dropStopped();
+  const id = activeEditor;
+  const { source, start, end } = takeSource($(id));
+  if (!source.trim()) { say('Select something to debug.'); return; }
+  const proc = image.debug(source, { receiver: id === 'i-eval' ? inspector.value : null });
+  if (proc.error) { showError(proc.error, start, id); return; }
+  $(RESULT_BOX[id]).hidden = true;
+  openDebugger(proc, { id, how: 'do', source, start, end });
+}
+
+/** A run the debugger had ended: back to where it came from, with its result. */
+function debugEnded(outcome, how) {
+  const origin = debugging;
+  debugging = null;
+  showTab(origin?.id === 'b-code' ? 'browser' : 'workspace');
+  if (!origin) return;
+  if (how === 'abandon') { showResult('Abandoned.', 0, origin.id); return; }
+  finish(outcome, origin);
 }
 
 /** Opens the browser on the class the selection, or the word at the caret, names. */
@@ -468,18 +555,19 @@ function run(command) {
   else if (command === 'printit') evaluate('print');
   else if (command === 'inspectit') evaluate('inspect');
   else if (command === 'browseit') browseIt();
+  else if (command === 'debugit') debugIt();
   else if (command === 'keep') keep();
   else if (command === 'stop') stop();
 }
 
 function showTab(name) {
-  tab = name === 'browser' ? 'browser' : 'workspace';
-  remember('slip.tab', tab);
-  $('workspace-pane').hidden = tab !== 'workspace';
-  $('browser-pane').hidden = tab !== 'browser';
-  $('tab-workspace').setAttribute('aria-selected', String(tab === 'workspace'));
-  $('tab-browser').setAttribute('aria-selected', String(tab === 'browser'));
-  if (activeEditor !== 'i-eval') activeEditor = tab === 'browser' ? 'b-code' : 'editor';
+  tab = name === 'browser' || (name === 'debugger' && debug.process) ? name : 'workspace';
+  if (tab !== 'debugger') remember('slip.tab', tab);
+  for (const pane of ['workspace', 'browser', 'debugger']) {
+    $(`${pane}-pane`).hidden = tab !== pane;
+    $(`tab-${pane}`).setAttribute('aria-selected', String(tab === pane));
+  }
+  if (activeEditor !== 'i-eval' && tab !== 'debugger') activeEditor = tab === 'browser' ? 'b-code' : 'editor';
   if (tab === 'browser') browser.render();
 }
 
@@ -544,6 +632,7 @@ function renderRunning() {
       { kind: 'button', id: 'printit', label: 'Print it', disabled: Boolean(running) },
       { kind: 'button', id: 'inspectit', label: 'Inspect it', disabled: Boolean(running) },
       { kind: 'button', id: 'browseit', label: 'Browse it', disabled: Boolean(running) },
+      { kind: 'button', id: 'debugit', label: 'Debug it', disabled: Boolean(running) },
       { kind: 'button', id: 'stop', label: 'Stop', disabled: !running },
     ] }).catch(() => { $('own-toolbar').hidden = false; });
   } else {
@@ -588,6 +677,7 @@ $('clear-transcript').addEventListener('click', () => { transcriptText = ''; $('
 for (const id of Object.keys(RESULT_BOX)) $(id).addEventListener('focus', () => { activeEditor = id; });
 $('tab-workspace').addEventListener('click', () => showTab('workspace'));
 $('tab-browser').addEventListener('click', () => showTab('browser'));
+$('tab-debugger').addEventListener('click', () => showTab('debugger'));
 $('own-toolbar').addEventListener('click', event => { const command = event.target.closest('button')?.dataset.command; if (command) run(command); });
 window.addEventListener('pagehide', () => { const page = currentPage(); if (page) { page.source = $('editor').value; savePage(page); } });
 
@@ -597,6 +687,13 @@ inspector = createInspector({ image: () => image, h, say,
     $('inspector').hidden = !on;
     $('app').dataset.inspecting = String(on);
     if (!on && activeEditor === 'i-eval') activeEditor = tab === 'browser' ? 'b-code' : 'editor';
+  } });
+
+debug = createDebugger({ image: () => image, h, say, track, ended: debugEnded,
+  inspect: value => inspector.inspect(value),
+  show: on => {
+    $('tab-debugger').hidden = !on;
+    if (!on && tab === 'debugger') showTab('workspace');
   } });
 
 async function start() {

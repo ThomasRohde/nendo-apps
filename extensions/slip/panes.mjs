@@ -1,7 +1,8 @@
-// Slip's class browser and inspector, drawn from tools.mjs. The view hands each one what it
-// needs: the image, its helpers, and how to evaluate in a text area.
+// Slip's class browser, inspector and debugger, drawn from tools.mjs. The view hands each one
+// what it needs: the image, its helpers, and how to evaluate in a text area.
 import { ALL, SIDES, METHOD_TEMPLATE, packages, classesIn, protocols, selectors, methodOf, classDefinition, classTemplate,
-  accept, setComment, classNamed, fields, moreIndexed, titleOf, printed } from './tools.mjs';
+  accept, setComment, classNamed, fields, moreIndexed, titleOf, printed,
+  frameLabel, frameSource, frameRange, frameFields, stoppedTitle, firstFrame } from './tools.mjs';
 
 const $ = id => document.getElementById(id);
 
@@ -227,4 +228,92 @@ export function createInspector(env) {
   $('i-close').addEventListener('click', () => { stack = []; env.open(false); });
 
   return { inspect, render, get value() { return top()?.value ?? null; }, get open() { return stack.length > 0; } };
+}
+
+// ---- The debugger --------------------------------------------------------------------
+
+/**
+ * env: { image(), h, say, inspect(value), show(on), track(promise), ended(outcome, how) }.
+ * The debugger holds one stopped process: its stack, the chosen frame's source with the send
+ * it waits on marked, and its fields. Proceed, Into and Over run it on through track(), which
+ * lets Stop reach it; a run that stops again comes back here, one that ends goes to ended().
+ */
+export function createDebugger(env) {
+  let proc = null;
+  let frames = [];
+  let chosen = 0;
+
+  function open(stopped) {
+    proc = stopped;
+    frames = env.image().vm.framesOf(proc);
+    chosen = firstFrame(env.image().vm, proc, frames);
+    env.show(true);
+    render();
+  }
+
+  function close() {
+    proc = null;
+    frames = [];
+    env.show(false);
+  }
+
+  function render() {
+    if (!proc) return;
+    const image = env.image();
+    const vm = image.vm;
+    $('d-title').textContent = stoppedTitle(vm, proc);
+    $('d-stack').replaceChildren(...frames.map((frame, i) => env.h('li', { role: 'option', 'data-index': String(i), 'aria-selected': String(i === chosen),
+      onclick: () => { chosen = i; render(); } }, frameLabel(vm, frame))));
+    const frame = frames[chosen];
+    const source = frame ? frameSource(frame) : '';
+    const atStep = chosen === 0 && proc.suspended?.kind !== 'unhandled';
+    const range = frame ? frameRange(frame, { next: atStep }) : null;
+    const code = $('d-source');
+    if (range) {
+      const mark = env.h('mark', {}, source.slice(range.start, range.end));
+      code.replaceChildren(source.slice(0, range.start), mark, source.slice(range.end));
+      mark.scrollIntoView({ block: 'nearest' });
+    } else code.replaceChildren(source || '(no source)');
+    $('d-fields').replaceChildren(...(frame ? frameFields(vm, frame) : []).map(row => env.h('li', {},
+      env.h('button', { type: 'button', 'data-label': row.label, title: `Inspect ${row.label}`, onclick: () => env.inspect(row.value) },
+        env.h('span', { class: 'label' }, row.label), env.h('span', { class: 'value' }, printed(image, row.value))))));
+    for (const id of ['d-proceed', 'd-restart', 'd-into', 'd-over', 'd-abandon']) $(id).disabled = false;
+  }
+
+  async function go(mode) {
+    if (!proc) return;
+    const image = env.image();
+    const frame = frames[chosen];
+    // Into from an exception no handler took steps over, in the frame shown: what lies above
+    // it is the signalling machinery.
+    const how = mode === 'into' && proc.suspended?.kind === 'unhandled' ? 'over' : mode;
+    for (const id of ['d-proceed', 'd-restart', 'd-into', 'd-over', 'd-abandon']) $(id).disabled = true;
+    const outcome = await env.track(image.continue(proc, { mode: how, frame }));
+    if (outcome.suspended) { open(outcome.suspended); return; }
+    close();
+    env.ended(outcome, mode);
+  }
+
+  function restart() {
+    if (!proc) return;
+    const problem = env.image().restart(proc, frames[chosen]);
+    if (problem) env.say(`An ensure: block failed while restarting: ${problem}`, { problem: true });
+    open(proc);
+  }
+
+  function abandon() {
+    if (!proc) return;
+    const problem = env.image().abandon(proc);
+    if (problem) env.say(`An ensure: block failed while abandoning: ${problem}`, { problem: true });
+    close();
+    env.ended(null, 'abandon');
+  }
+
+  $('d-proceed').addEventListener('click', () => go('proceed'));
+  $('d-into').addEventListener('click', () => go('into'));
+  $('d-over').addEventListener('click', () => go('over'));
+  $('d-restart').addEventListener('click', restart);
+  $('d-abandon').addEventListener('click', abandon);
+
+  return { open, render, close, proceed: () => go('proceed'), abandon, get process() { return proc; }, get frame() { return frames[chosen] ?? null; } };
 }

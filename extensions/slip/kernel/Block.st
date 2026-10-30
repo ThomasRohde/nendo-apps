@@ -1,4 +1,4 @@
-"Slip kernel: BlockClosure. ensure:, ifCurtailed: and on:do: come with exceptions, in step 3."!
+"Slip kernel: BlockClosure. on:do:, ensure: and ifCurtailed: are with the exceptions, in Exception.st."!
 
 !BlockClosure methodsFor: 'evaluating'!
 value

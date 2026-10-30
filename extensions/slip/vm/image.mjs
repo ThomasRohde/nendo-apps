@@ -88,6 +88,7 @@ export class Image {
       if (proc.error) result.errors.push(`${origin}: ${proc.error.message}`);
       else {
         this.vm.run(proc);
+        if (proc.suspended) this.vm.endAsError(proc);
         if (proc.error) result.errors.push(`${origin}: ${proc.error.message} in "${piece.slice(0, 60)}"`);
       }
       result.doits++;
@@ -108,6 +109,7 @@ export class Image {
   evaluateSync(source) {
     const proc = this.process(source);
     if (!proc.done) this.vm.run(proc);
+    if (proc.suspended) this.vm.endAsError(proc);
     return { value: proc.value, error: proc.error };
   }
 
@@ -134,16 +136,47 @@ export class Image {
 
   /**
    * Evaluates a doit in time slices of about 8 ms, yielding to the page between them.
-   * Answers a promise of {value, error, ms}. evaluation.stop() interrupts it. With a receiver,
-   * self in the doit is that object, as in an inspector.
+   * Answers a promise of {value, error, ms, suspended}; suspended is the process when it
+   * stopped for the debugger (an exception no handler took, or Stop), and then continue()
+   * takes it on. evaluation.stop() stops it. With a receiver, self in the doit is that object,
+   * as in an inspector.
    */
   evaluate(source, { slice = 8, yieldTo = defaultYield, receiver = null } = {}) {
+    return this.continue(this.process(source, receiver), { slice, yieldTo });
+  }
+
+  /** A process for the doit that stops before its first statement, for Debug it. */
+  debug(source, { receiver = null } = {}) {
     const proc = this.process(source, receiver);
+    if (!proc.done) proc.suspended = { kind: 'debug' };
+    return proc;
+  }
+
+  /**
+   * Runs a process on: from its start, or from where it stopped. mode: 'proceed' runs to the
+   * end; 'over' stops at the next send in frame (or in its sender once frame returns); 'into'
+   * stops at the next send anywhere. Proceeding past an exception no handler took makes its
+   * signal answer nil. Answers a promise like evaluate's.
+   */
+  continue(proc, { mode = 'proceed', frame = null, slice = 8, yieldTo = defaultYield } = {}) {
+    const vm = this.vm;
+    const stopped = proc.suspended;
+    if (stopped) {
+      const atSend = stopped.kind !== 'unhandled';
+      if (stopped.kind === 'unhandled') proc.ctx.stack.push(null);
+      proc.suspended = null;
+      const top = proc.ctx;
+      if (mode === 'over') {
+        const target = frame ?? top;
+        proc.watch = { test: c => c === target || (target.dead && c.depth < target.depth), skipFirst: atSend && target === top };
+      } else if (mode === 'into') proc.watch = { test: () => true, skipFirst: atSend };
+      else proc.watch = null;
+    }
     const started = performance.now();
     const promise = new Promise(resolve => {
       const step = () => {
-        if (!proc.done) this.vm.run(proc, slice);
-        if (proc.done) resolve({ value: proc.value, error: proc.error, ms: performance.now() - started });
+        if (!proc.done && !proc.suspended) vm.run(proc, slice);
+        if (proc.done || proc.suspended) resolve({ value: proc.value, error: proc.error, ms: performance.now() - started, suspended: proc.suspended ? proc : null });
         else yieldTo(step);
       };
       step();
@@ -151,6 +184,35 @@ export class Image {
     promise.stop = () => { proc.interrupted = true; };
     promise.process = proc;
     return promise;
+  }
+
+  /**
+   * Puts a stopped process back at the start of a frame. The unwind blocks of the frames above
+   * it run first. Answers the problem text when one of them failed, else null.
+   */
+  restart(proc, frame) {
+    const problem = this.unwind(proc.ctx, frame);
+    for (let c = proc.ctx; c && c !== frame; c = c.sender) c.dead = true;
+    this.vm.restartContext(frame);
+    proc.ctx = frame;
+    proc.suspended = { kind: 'step' };
+    return problem;
+  }
+
+  /** Ends a stopped process, running the unwind blocks (ensure:) it still has. */
+  abandon(proc) {
+    const problem = proc.ctx ? this.unwind(proc.ctx, null) : null;
+    for (let c = proc.ctx; c; c = c.sender) c.dead = true;
+    proc.done = true;
+    proc.ctx = null;
+    proc.suspended = null;
+    proc.abandoned = true;
+    return problem;
+  }
+
+  unwind(from, to) {
+    try { this.vm.sendSync(from, 'unwindTo:', [to], 2000); return null; }
+    catch (error) { return error.message; }
   }
 }
 
