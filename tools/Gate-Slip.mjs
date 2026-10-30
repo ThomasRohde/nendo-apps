@@ -339,8 +339,50 @@ async page => {
   await page.mouse.up();
   await page.waitForFunction(() => /^\[\[[^\]]*\],\['Drag this card to Doing'/.test(window.broker.records('st.object').find(r => r.values['st.object.name'] === 'cards')?.values['st.object.ston'] ?? ''), null, { timeout: 5000 });
   assert((await board()).startsWith('[[\'Add a card: type it above, then press Enter\',\'Buy milk\'],[\'Drag this card to Doing\''), `The dragged card must be kept in Doing: ${await board()}`);
-  await frame.locator('#tab-workspace').click();
   passed('world and cards');
+
+  // 22. Open Sheets files the spreadsheet in as records and opens it on its example. A formula
+  // typed on the canvas, with a cell pointed at by a click, is calculated, drawn in its cell and
+  // kept; a dragged range is summed in the status line; Ctrl+C and Ctrl+V move the references.
+  await frame.locator('#w-sheets').click();
+  await frame.waitForFunction(() => window.slip.display.ops.some(op => op[0] === 'text' && op[1] === 'Sheets'), null, { timeout: 10000 });
+  await page.waitForFunction(() => window.broker.records('st.method').filter(r => r.values['st.method.className']?.startsWith('Sheet')).length > 200, null, { timeout: 20000 });
+  assert((await records('st.class')).filter(r => r.values['st.class.package'] === 'Sheets').length >= 18, 'Sheets\' classes must be kept as records.');
+  const grid = 'World submorphs first grid';
+  const cellCentre = async place => onCanvas(`(${grid} rectOf: ${place}) center`);
+  await page.mouse.click(...await cellCentre('6 @ 2'));
+  await page.keyboard.type('=');
+  await page.mouse.click(...await cellCentre('4 @ 7'));
+  await page.keyboard.type('/4');
+  await page.keyboard.press('Enter');
+  await frame.waitForFunction(() => window.slip.image.print('World submorphs first sheet sourceAt: 6 @ 2') === "'=D7/4'", null, { timeout: 5000 });
+  assert(await slipPrint('World submorphs first sheet at: \'F2\'') === '(737/20)', 'The formula must be calculated exactly.');
+  const f2 = await slipPrint(`${grid} rectOf: 6 @ 2`);
+  const [[fx, fy], [fr]] = f2.split(' corner: ').map(p => p.split('@').map(Number));
+  await frame.waitForFunction(() => window.slip.display.ops.some(op => op[0] === 'text' && op[1] === '36.85'), null, { timeout: 5000 }).catch(() => {});
+  const drawn = await frame.evaluate(() => window.slip.display.ops.find(op => op[0] === 'text' && op[1] === '36.85'));
+  assert(drawn && drawn[2] > fx && drawn[2] < fr && drawn[3] > fy && drawn[3] < fy + 26, `36.85 must be drawn inside F2 (${f2}): ${JSON.stringify(drawn)}`);
+  await page.waitForFunction(() => /'F2':'=D7\/4'/.test(window.broker.records('st.object').find(r => r.values['st.object.name'] === 'sheet')?.values['st.object.ston'] ?? ''), null, { timeout: 5000 });
+  // The page counts the presses of a double click itself: the second press opens the editor.
+  await page.mouse.dblclick(...await cellCentre('6 @ 2'));
+  await frame.waitForFunction(grid => window.slip.image.print(`${grid} isEditing & (${grid} editText = '=D7/4')`) === 'true', grid, { timeout: 5000 })
+    .catch(async () => { throw Error(`A double click on F2 must edit its formula: ${await slipPrint(`${grid} editText`)}`); });
+  await page.keyboard.press('Escape');
+  const top = await cellCentre('3 @ 2'), bottom = await cellCentre('3 @ 5');
+  await page.mouse.move(...top);
+  await page.mouse.down();
+  await page.mouse.move(...bottom, { steps: 5 });
+  await page.mouse.up();
+  await frame.waitForFunction(() => window.slip.display.ops.some(op => op[0] === 'text' && op[1].startsWith('Sum 80.65')), null, { timeout: 5000 });
+  await page.mouse.click(...await cellCentre('6 @ 2'));
+  await page.keyboard.press('Control+c');
+  await page.mouse.click(...await cellCentre('7 @ 3'));
+  await page.keyboard.press('Control+v');
+  await frame.waitForFunction(() => window.slip.image.print('World submorphs first sheet sourceAt: 7 @ 3') === "'=E8/4'", null, { timeout: 5000 });
+  await page.keyboard.press('Control+z');
+  await frame.waitForFunction(() => window.slip.image.print('World submorphs first sheet sourceAt: 7 @ 3') === "''", null, { timeout: 5000 });
+  await frame.locator('#tab-workspace').click();
+  passed('sheets');
 
   // 21. A file Slip built before kept objects and evaluations: code is kept as before, and a
   // notice offers the two later record types. This broker takes no proposals, so it says so.

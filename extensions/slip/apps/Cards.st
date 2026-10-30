@@ -22,7 +22,8 @@ CardsCard comment: 'One card: its text, and a button that removes it. Drag it to
 !CardsBoard class methodsFor: 'opening'!
 open
 	"CardsBoard open"
-	World submorphs copy do: [:each | (each isKindOf: self) ifTrue: [each delete]].
+	"The app fills the World, so it takes the World's place: what was open there closes."
+	World removeAllMorphs.
 	^World open: self new
 !
 keptName

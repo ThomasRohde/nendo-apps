@@ -65,6 +65,15 @@ A Smalltalk environment in a Nendo file. `workspace/Slip.nendo` opens on it (`sl
   records and can be read and changed in the Browser, then opens it (`CardsBoard open`). Type a card
   and press Enter, drag a card to another column, press x to remove one. The board is kept as the
   object named `cards`.
+- **Sheets** is a spreadsheet written in Smalltalk, about 270 methods in 18 classes: a formula
+  lexer and parser, a tree of formula nodes, 24 functions (`SUM`, `AVERAGE`, `IF`, `IFERROR`,
+  `CONCAT` ...), exact numbers (`=1/3` stays a fraction), errors that are values (`#DIV/0!`,
+  `#REF!`, `#CIRC!`), recalculation in dependency order, and undo. **Open Sheets**, in the World
+  tab, files it in from `apps/Sheets.st` and opens it on a small budget. Type in a cell, or start a
+  formula with `=` and click the cells it reads; double-click or F2 to edit; drag to select and read
+  the sum below; Ctrl+C and Ctrl+V move a formula's relative references; drag a column's edge to
+  resize it. **Records** fills the sheet from one of the file's record types. The sheet is kept as
+  the object named `sheet`. Add a function as a method `fnNAME:` on `SheetFunctions`, in the Browser.
 - **Ask the agent**, in the debugger, sends your agent the stopped run's stack, with its methods
   as the file's records. Nendo asks you first; the reply goes to the Transcript.
 
@@ -108,7 +117,7 @@ A Smalltalk environment in a Nendo file. `workspace/Slip.nendo` opens on it (`sl
 
 - The lane is `pwsh ./tools/Test-Apps.ps1 -Lane Slip` (`tools/Review-Slip.ps1`): the node tests
   in `tools/slip/` (kernel conformance, language, exceptions and debugger, records, package, browser and inspector,
-  bridge and agent, display and Cards), then `tools/Gate-Slip.mjs`
+  bridge and agent, display and Cards, Sheets), then `tools/Gate-Slip.mjs`
   against the host's fixture broker.
 - `node tools/Build-Slip.mjs --endpoint http://127.0.0.1:PORT/mcp --accept` builds the app into
   an empty, host-created file at Unattended: the record types, the package and the view, then

@@ -137,7 +137,7 @@ const NAMES = {
     ['Rect', 'Object', 'origin corner', 'fixed'],
     ['Color', 'Object', 'red green blue alpha', 'fixed'],
     ['Canvas', 'Object', '', 'fixed'],
-    ['UIEvent', 'Object', 'type position button key shift', 'fixed'],
+    ['UIEvent', 'Object', 'type position button key shift ctrl clicks delta', 'fixed'],
     ['Morph', 'Object', 'bounds color owner submorphs', 'fixed'],
     ['StringMorph', 'Morph', 'contents size bold', 'fixed'],
     ['ButtonMorph', 'Morph', 'label action', 'fixed'],
